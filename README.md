@@ -169,6 +169,7 @@ AGENT_MODEL=anthropic/claude-haiku-4.5
 MODEL_ROUTER=typesafe/jev-router
 MAX_CONCURRENT_RUNS=3
 SPEND_FILE=/data/spend.json
+PORT=8000             # the service domain targets 8000
 OPENROUTER_API_KEY=   # set only for the recorded demo
 E2B_API_KEY=          # required for sandboxes
 DEMO_KEY=             # required for real runs
