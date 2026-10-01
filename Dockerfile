@@ -14,7 +14,7 @@ COPY tests/fixtures ./tests/fixtures
 COPY config.yaml ./
 
 # Runtime configuration comes from the environment (see .env.example).
-ENV LLM_PROVIDER=mock SANDBOX_PROVIDER=e2b SPEND_FILE=/data/spend.json MAX_CONCURRENT_RUNS=3 PORT=8000
+ENV LLM_PROVIDER=mock SANDBOX_PROVIDER=e2b MODEL_ROUTER=typesafe/jev-router SPEND_FILE=/data/spend.json MAX_CONCURRENT_RUNS=3 PORT=8000
 RUN mkdir -p /data
 EXPOSE 8000
 CMD ["sh", "-c", "uv run --no-sync uvicorn api.main:app --host 0.0.0.0 --port ${PORT}"]

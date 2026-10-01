@@ -239,6 +239,7 @@ section { padding: 72px 0 56px; border-bottom: 1px solid var(--hairline); }
 .ev[data-kind="run_started"]::before, .ev[data-kind="run_finished"]::before { border-color: var(--accent); background: var(--accent); }
 .ev[data-kind="error"]::before { border-color: var(--diff-remove); background: var(--diff-remove); }
 .ev[data-kind="assistant_text"]::before { border-color: var(--muted); }
+.ev[data-kind="model_routed"]::before { border-color: var(--accent); }
 @keyframes enter { to { opacity: 1; transform: none; } }
 
 .ev-head {

@@ -11,6 +11,10 @@ from typing import Any, Protocol
 from agent.cost import Usage, usage_from_response
 
 DEFAULT_MODEL = "anthropic/claude-haiku-4.5"
+# OpenRouter's Jev Router (typesafe/jev-router) picks a model per request based on
+# the prompt. We route the first turn through it, then pin the chosen model for the
+# rest of the run so Anthropic prompt caching keeps hitting. MODEL_ROUTER= disables it.
+DEFAULT_ROUTER = "typesafe/jev-router"
 FIXTURES = Path(__file__).resolve().parents[1] / "tests" / "fixtures"
 
 
@@ -26,6 +30,7 @@ class Completion:
     text: str
     tool_calls: list[ToolCall] = field(default_factory=list)
     usage: Usage = field(default_factory=Usage)
+    model: str = ""  # model that actually served this turn
 
     def to_message(self) -> dict[str, Any]:
         msg: dict[str, Any] = {"role": "assistant", "content": self.text or None}
@@ -75,11 +80,20 @@ class OpenRouterProvider:
 
     name = "openrouter"
 
-    def __init__(self, api_key: str, model: str | None = None) -> None:
+    def __init__(self, api_key: str, model: str | None = None, router: str | None = None) -> None:
         from openai import AsyncOpenAI
 
         self.model = model or os.environ.get("AGENT_MODEL") or DEFAULT_MODEL
+        env_router = os.environ.get("MODEL_ROUTER")
+        self.router = router if router is not None else (DEFAULT_ROUTER if env_router is None else env_router)
+        self.routed_model: str | None = None
         self._client = AsyncOpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1")
+
+    def _request_model(self) -> str:
+        """Jev on the first turn (routing on the task prompt), pinned model afterwards."""
+        if self.routed_model:
+            return self.routed_model
+        return self.router or self.model
 
     @staticmethod
     def _with_cache(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -94,11 +108,16 @@ class OpenRouterProvider:
         return out
 
     async def complete(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> Completion:
+        request_model = self._request_model()
         response = await self._client.chat.completions.create(
-            model=self.model,
+            model=request_model,
             messages=self._with_cache(messages),
             tools=tools,
         )
+        served = response.model or request_model
+        if served == request_model and request_model == self.router:
+            served = self.model  # router did not report the routed model; assume the default
+        self.routed_model = served
         choice = response.choices[0].message
         calls = [
             ToolCall(c.id, c.function.name, _parse_args(c.function.arguments))
@@ -106,7 +125,7 @@ class OpenRouterProvider:
         ]
         raw_usage = response.usage.model_dump() if response.usage else None
         return Completion(text=choice.content or "", tool_calls=calls,
-                          usage=usage_from_response(self.model, raw_usage))
+                          usage=usage_from_response(served, raw_usage), model=served)
 
 
 def _parse_args(raw: str) -> dict[str, Any]:

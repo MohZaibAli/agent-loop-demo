@@ -145,6 +145,7 @@ async def status() -> dict[str, Any]:
         "real_available": bool(os.environ.get("OPENROUTER_API_KEY")) and bool(os.environ.get("DEMO_KEY")),
         "sandbox_provider": sandbox_provider(),
         "model": os.environ.get("AGENT_MODEL") or "anthropic/claude-haiku-4.5",
+        "router": os.environ.get("MODEL_ROUTER", "typesafe/jev-router"),
         "max_concurrent_runs": int(os.environ.get("MAX_CONCURRENT_RUNS", "3")),
         "defaults": DEFAULTS,
     }

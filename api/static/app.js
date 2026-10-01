@@ -221,6 +221,9 @@
       case "error":
         return list.appendChild(makeRow("error", `<span class="fail">ERROR</span>`,
           `<div class="ev-body">${esc(ev.message)}</div>`, null, false, delay));
+      case "model_routed":
+        return list.appendChild(makeRow("model_routed", `ROUTED ${ts}`,
+          `<div class="ev-cmd">${esc(ev.model)}</div>`, null, false, delay));
       case "run_finished": {
         const label = ev.status === "complete" ? "RUN COMPLETE" : `RUN ${esc(ev.status).toUpperCase()}`;
         return list.appendChild(makeRow("run_finished", `${label} <span class="t">${ev.turns} turns · ${fmtCost(ev.cost)}</span>`,
@@ -239,7 +242,7 @@
       onEvent(ev);
       if (ev.type === "run_finished") { es.close(); onDone(ev); }
     };
-    for (const t of ["run_started", "assistant_text", "tool_call", "tool_result", "usage", "run_finished", "error"]) {
+    for (const t of ["run_started", "assistant_text", "tool_call", "tool_result", "usage", "model_routed", "run_finished", "error"]) {
       es.addEventListener(t, handler);
     }
     es.onerror = () => { es.close(); onDone(null); };
@@ -280,9 +283,10 @@
     subscribe(run_id, (ev) => {
       if (ev.type === "run_started") {
         $("m-sandbox").textContent = ev.sandbox_id;
-        $("m-model").textContent = ev.model;
+        $("m-model").textContent = ev.router ? `${ev.router} → …` : ev.model;
         setStatus("running");
       }
+      if (ev.type === "model_routed") $("m-model").textContent = ev.model;
       if (ev.type === "usage") {
         setCounter("m-turns", ev.turn, (v) => pad2(Math.round(v)));
         setCounter("m-tokens", ev.cumulative.total_tokens, (v) => fmtInt(Math.round(v)));

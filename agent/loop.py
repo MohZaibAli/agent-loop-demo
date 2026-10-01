@@ -40,6 +40,7 @@ class RunResult:
     model: str
     provider: str
     diff: str = ""
+    routed_model: str = ""
     events: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
@@ -48,7 +49,8 @@ class RunResult:
             "tests_passed": self.tests_passed, "tests_failed": self.tests_failed,
             "turns": self.turns, "tokens": self.usage.total_tokens, "cost": round(self.usage.cost, 6),
             "usage": self.usage.to_dict(), "sandbox_id": self.sandbox_id,
-            "model": self.model, "provider": self.provider, "diff": self.diff,
+            "model": self.model, "routed_model": self.routed_model or self.model,
+            "provider": self.provider, "diff": self.diff,
         }
 
 
@@ -74,6 +76,7 @@ async def run_agent(
     tests: tuple[int, int] | None = None
     diffs: list[str] = []
     turns = 0
+    routed_model = ""
     sandbox: Sandbox | None = None
     is_real = provider.name != "mock"
     started = time.monotonic()
@@ -81,7 +84,7 @@ async def run_agent(
     def finish(status: str, summary: str) -> RunResult:
         result = RunResult(status, summary, tests[0] if tests else None, tests[1] if tests else None,
                            turns, usage, sandbox.sandbox_id if sandbox else None,
-                           provider.model, provider.name, "\n".join(diffs))
+                           provider.model, provider.name, "\n".join(diffs), routed_model)
         events.emit("run_finished", **result.to_dict())
         result.events = [e.to_dict() for e in events.events]
         return result
@@ -95,8 +98,8 @@ async def run_agent(
     try:
         sandbox = await sandbox_factory()
         events.emit("run_started", run_id=run_id, task=task, sandbox_id=sandbox.sandbox_id,
-                    model=provider.model, provider=provider.name, max_turns=max_turns,
-                    max_cost_usd=max_cost_usd)
+                    model=provider.model, router=getattr(provider, "router", None) or "",
+                    provider=provider.name, max_turns=max_turns, max_cost_usd=max_cost_usd)
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": task},
@@ -111,6 +114,9 @@ async def run_agent(
             usage.add(completion.usage)
             if is_real and budget is not None:
                 budget.add(completion.usage.cost)
+            if completion.model and completion.model != routed_model:
+                routed_model = completion.model
+                events.emit("model_routed", turn=turns, model=routed_model)
             events.emit("usage", turn=turns, **completion.usage.to_dict(),
                         cumulative=usage.to_dict())
             if completion.text:

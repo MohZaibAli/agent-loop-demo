@@ -304,3 +304,62 @@ async def test_isolation_fixture_on_local_sandboxes():
     assert "file not found" in read.data["result"]["error"]
     ls = [e for e in b.events if e.type == "tool_result" and e.data["name"] == "bash"][0]
     assert "ISOLATION_MARKER" not in ls.data["result"]["stdout"]
+
+
+# --- Jev model routing ---------------------------------------------------------
+
+class _Resp:
+    """Minimal stand-in for an OpenAI chat completion response."""
+
+    def __init__(self, model: str):
+        from types import SimpleNamespace as NS
+        self.model = model
+        self.choices = [NS(message=NS(content="ok", tool_calls=None))]
+        self.usage = NS(model_dump=lambda: {"prompt_tokens": 10, "completion_tokens": 2, "total_tokens": 12, "cost": 0.0001})
+
+
+async def test_jev_router_routes_first_turn_then_pins(monkeypatch):
+    monkeypatch.delenv("MODEL_ROUTER", raising=False)
+    p = OpenRouterProvider("sk-test")
+    assert p.router == "typesafe/jev-router"
+    requested = []
+
+    async def fake_create(**kw):
+        requested.append(kw["model"])
+        return _Resp("anthropic/claude-sonnet-4.5")
+
+    monkeypatch.setattr(p._client.chat.completions, "create", fake_create)
+    c1 = await p.complete([{"role": "system", "content": "s"}], [])
+    c2 = await p.complete([{"role": "system", "content": "s"}], [])
+    assert requested == ["typesafe/jev-router", "anthropic/claude-sonnet-4.5"]
+    assert c1.model == c2.model == "anthropic/claude-sonnet-4.5"
+    assert c1.usage.cost == 0.0001
+
+
+async def test_router_disabled_uses_agent_model(monkeypatch):
+    monkeypatch.setenv("MODEL_ROUTER", "")
+    p = OpenRouterProvider("sk-test")
+    requested = []
+
+    async def fake_create(**kw):
+        requested.append(kw["model"])
+        return _Resp(kw["model"])
+
+    monkeypatch.setattr(p._client.chat.completions, "create", fake_create)
+    await p.complete([], [])
+    assert requested == [MODEL]
+
+
+async def test_loop_emits_model_routed_event():
+    class Routed(ListProvider):
+        async def complete(self, messages, tools):
+            c = await super().complete(messages, tools)
+            c.model = "anthropic/claude-sonnet-4.5"
+            return c
+
+    log = EventLog()
+    r = await run_agent("t", Routed([]), seed_factory, log)
+    routed = [e for e in log.events if e.type == "model_routed"]
+    assert len(routed) == 1 and routed[0].data["model"] == "anthropic/claude-sonnet-4.5"
+    assert r.to_dict()["routed_model"] == "anthropic/claude-sonnet-4.5"
+    assert [e.type for e in log.events[:3]] == ["run_started", "model_routed", "usage"]
