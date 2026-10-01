@@ -18,7 +18,7 @@
     <input id="demo-key" class="demo-key" type="password" autocomplete="off" spellcheck="false"
            placeholder="demo key" aria-label="Demo key" hidden>
     <button id="mode" class="mode" type="button" hidden aria-pressed="false" title="Toggle between the free scripted replay and the paid live model">
-      <span class="mode-opt" data-m="mock">MOCK</span><span class="mode-opt" data-m="live">LIVE</span>
+      <span class="mode-opt" data-m="mock">MOCK · FREE</span><span class="mode-opt" data-m="live">LIVE · BILLED</span>
     </button>
     <span id="provider-label" class="provider-label" data-provider="mock">MOCK</span>
     <span id="budget" class="budget"><span id="budget-remaining">$4.000</span> remaining</span>
@@ -34,10 +34,10 @@
       the repository, edits it, and proves the fix by running the tests — as a node in your workflow.</p>
 
     <form id="task-form" class="workbench" autocomplete="off">
-      <p class="workbench-label">REPOSITORY</p>
+      <p class="workbench-label">01 — CHOOSE A REPOSITORY</p>
       <div id="scenarios" class="scenarios" role="radiogroup" aria-label="Repository"></div>
       <p id="scenario-note" class="scenario-note" hidden></p>
-      <label class="workbench-label" for="task">TASK</label>
+      <label class="workbench-label" for="task">02 — TASK</label>
       <div class="workbench-input">
         <span class="prompt" aria-hidden="true">›</span>
         <textarea id="task" name="task" rows="1" spellcheck="false">Fix the parser so all tests pass</textarea>
@@ -53,7 +53,7 @@
   <section id="live" class="overlay live" hidden aria-modal="true" role="dialog" aria-label="Live run">
     <header class="overlay-head">
       <p class="label">02 — LIVE RUN</p>
-      <p id="live-task" class="overlay-task mono"></p>
+      <p class="overlay-task"><span id="live-mode" class="mode-badge" data-mode="mock">MOCK · SCRIPTED REPLAY · FREE</span><span id="live-task" class="mono"></span></p>
       <div class="overlay-tools">
         <button type="button" id="notes-toggle" class="toggle" aria-pressed="true" title="Show what each stage used under the hood">NOTES</button>
         <button type="button" class="btn btn-close" data-close="live">Close ✕</button>
@@ -66,7 +66,13 @@
           <p class="label">RESULT</p>
           <p class="report-score"><span id="report-tests" class="score">—</span><span class="score-label">TESTS PASSED</span></p>
           <p id="report-summary" class="report-summary"></p>
+          <p id="report-bill" class="report-bill mono"></p>
           <div id="report-diff" class="diff-wrap"></div>
+          <div id="report-next" class="report-next" hidden>
+            <p class="label">NEXT</p>
+            <button id="next-action" type="button" class="btn btn-primary"></button>
+            <p id="next-hint" class="next-hint"></p>
+          </div>
         </section>
       </div>
 
@@ -94,7 +100,7 @@
   <section id="parallel" class="overlay parallel" hidden aria-modal="true" role="dialog" aria-label="Parallel runs">
     <header class="overlay-head">
       <p class="label">03 — PARALLEL RUNS</p>
-      <p class="overlay-task">Three agents · three sandboxes · one task</p>
+      <p class="overlay-task"><span id="parallel-mode" class="mode-badge" data-mode="mock">MOCK · SCRIPTED REPLAY · FREE</span><span>Three agents · three sandboxes · one task</span></p>
       <div class="overlay-tools">
         <button type="button" class="btn btn-close" data-close="parallel">Close ✕</button>
       </div>
@@ -107,7 +113,7 @@
 <div id="key-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="key-title">
   <form id="key-form" class="modal-box" autocomplete="off">
     <p class="label" id="key-title">DEMO ACCESS</p>
-    <p class="modal-text">This scenario runs on the live model. Enter the demo password to start the run.</p>
+    <p class="modal-text">This scenario calls the real model. Each run is <b>billed</b> to the demo budget, typically $0.02 to $0.40 and capped at $0.75. Enter the demo password to start.</p>
     <input id="key-input" class="modal-input" type="password" placeholder="demo password" aria-label="Demo password" autocomplete="off" spellcheck="false">
     <p id="key-error" class="modal-error" hidden></p>
     <div class="modal-actions">

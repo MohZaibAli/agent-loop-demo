@@ -107,7 +107,7 @@ h1 em {
   font-size: 11px;
   letter-spacing: 0.08em;
 }
-.mode-opt { padding: 4px 9px; color: var(--muted); }
+.mode-opt { padding: 4px 9px; color: var(--muted); white-space: nowrap; }
 .mode-opt + .mode-opt { border-left: 1px solid var(--hairline); }
 .mode[aria-pressed="false"] .mode-opt[data-m="mock"] { color: var(--ink); background: var(--bg); }
 .mode[aria-pressed="true"] .mode-opt[data-m="live"] { color: #fff; background: var(--accent); }
@@ -270,6 +270,13 @@ section { padding: 72px 0 56px; border-bottom: 1px solid var(--hairline); }
 .overlay-head .label { margin: 0; }
 .overlay-task { margin: 0; font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .btn-close { padding: 6px 12px; font-size: 13px; }
+.mode-badge { font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; color: var(--muted); margin-right: 14px; white-space: nowrap; }
+.mode-badge[data-mode="live"] { color: var(--accent); }
+.report-bill { font-size: 12px; color: var(--muted); margin: -12px 0 20px; }
+.report-bill b { color: var(--accent); font-weight: 500; }
+.report-next { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--hairline); }
+.report-next .label { margin-bottom: 12px; }
+.next-hint { font-size: 14px; color: var(--muted); margin: 12px 0 0; max-width: 60ch; }
 .overlay-tools { display: flex; align-items: center; gap: 12px; }
 .toggle {
   font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em;
@@ -526,7 +533,9 @@ body.has-overlay { overflow: hidden; }
   .overlay { padding: 0 16px; }
   .overlay-head { grid-template-columns: auto 1fr auto; gap: 10px; height: 48px; }
   .overlay-head .label { margin: 0; white-space: nowrap; }
-  .overlay-task { display: none; }
+  .overlay-task { display: block; }
+  .overlay-task .mono { display: none; }
+  .mode-badge { font-size: 10px; margin: 0; }
   .overlay-tools { gap: 8px; }
   .btn-close, .toggle { padding: 5px 9px; font-size: 12px; }
 

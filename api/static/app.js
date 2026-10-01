@@ -16,6 +16,7 @@
     scenario: "listing_parser",
     scenarios: [],
     realAvailable: false,
+    remaining: 4,
     sandboxProvider: "",
     router: "",
     notes: storedNotes,
@@ -86,7 +87,9 @@
   async function refreshBudget() {
     try {
       const b = await (await fetch("/budget")).json();
-      $("budget-remaining").textContent = fmtCost(Math.min(4, b.remaining));
+      state.remaining = Math.min(4, b.remaining);
+      $("budget-remaining").textContent = fmtCost(state.remaining);
+      renderScenarios();
     } catch (_) { /* leave previous value */ }
   }
   async function refreshStatus() {
@@ -289,6 +292,12 @@
     }
   }
 
+  function setModeBadge(id, live) {
+    const el = $(id);
+    el.dataset.mode = live ? "live" : "mock";
+    el.textContent = live ? "LIVE · REAL MODEL · BILLED" : "MOCK · SCRIPTED REPLAY · FREE";
+  }
+
   // ---------- overlays ----------
   // Lock the page behind an overlay. iOS ignores overflow:hidden on body, so pin it in place.
   let savedScroll = 0;
@@ -436,6 +445,7 @@
   async function startRun(task) {
     openOverlay("live");
     $("live-task").textContent = task;
+    setModeBadge("live-mode", currentNeedsLive() || liveReady());
     $("timeline").innerHTML = "";
     $("report").hidden = true;
     counterCache.clear();
@@ -474,6 +484,7 @@
     $("m-run").textContent = run_id;
     $("m-provider").textContent = provider;
     setProviderLabel(provider);
+    setModeBadge("live-mode", provider !== "mock");
     setLive(+1);
 
     const pending = new Map();
@@ -526,13 +537,61 @@
     const total = (fin.tests_passed ?? 0) + (fin.tests_failed ?? 0);
     $("report-tests").textContent = fin.tests_passed == null ? "—" : `${fin.tests_passed}/${total}`;
     $("report-summary").textContent = fin.summary || "";
+    const live = fin.provider !== "mock";
+    $("report-bill").innerHTML = live
+      ? `Live run on <b>${esc(fin.routed_model || fin.model)}</b> · <b>${fmtCost(fin.cost)}</b> billed · ${fmtInt(fin.tokens)} tokens · ${fin.turns} turns`
+      : `Scripted replay · nothing billed · the sandbox, tools, edits and test runs were real`;
     $("report-diff").innerHTML = fin.diff ? renderDiff(fin.diff) : "";
+    showNextStep(live);
     $("report").hidden = false;
+  }
+
+  /** The report ends with the one action we want the viewer to take next. */
+  function showNextStep(wasLive) {
+    const box = $("report-next");
+    const btn = $("next-action");
+    const hint = $("next-hint");
+    const order = state.scenarios.map((sc) => sc.id);
+    const idx = order.indexOf(state.scenario);
+    const nextLive = state.scenarios.find((sc, i) => i > idx && !sc.mock);
+    btn.onclick = null;
+    if (!wasLive && nextLive) {
+      btn.textContent = `Run the live demo: ${nextLive.title} →`;
+      hint.textContent = "A real model, a harder repository, a real bill. You will be asked for the demo password.";
+      btn.onclick = async () => {
+        state.scenario = nextLive.id;
+        taskEl.value = nextLive.task;
+        autosize();
+        renderScenarios();
+        openOverlay(null);
+        if (await ensureAccess()) startRun(nextLive.task);
+      };
+    } else if (nextLive) {
+      btn.textContent = `Next case: ${nextLive.title} →`;
+      hint.textContent = "Same agent, a different codebase: the pipeline has three bugs across two modules.";
+      btn.onclick = async () => {
+        state.scenario = nextLive.id;
+        taskEl.value = nextLive.task;
+        autosize();
+        renderScenarios();
+        openOverlay(null);
+        if (await ensureAccess()) startRun(nextLive.task);
+      };
+    } else {
+      btn.textContent = "Run 3 agents in parallel →";
+      hint.textContent = "Three sandboxes, three independent traces, the same task. This is what concurrency looks like.";
+      btn.onclick = async () => {
+        openOverlay(null);
+        if (await ensureAccess()) startParallel(taskEl.value.trim());
+      };
+    }
+    box.hidden = false;
   }
 
   // ---------- parallel ----------
   async function startParallel(task) {
     openOverlay("parallel");
+    setModeBadge("parallel-mode", currentNeedsLive() || liveReady());
     const lanes = $("lanes");
     lanes.innerHTML = "";
     const tabs = $("lane-tabs");
@@ -555,6 +614,7 @@
     clearError();
     const { run_ids, provider } = await res.json();
     setProviderLabel(provider);
+    setModeBadge("parallel-mode", provider !== "mock");
 
     run_ids.forEach((runId, i) => {
       const lane = document.createElement("article");
@@ -670,19 +730,21 @@
     }
     const current = state.scenarios.find((sc) => sc.id === state.scenario);
     const note = $("scenario-note");
+    const billed = `<b>Billed.</b> Calls the real model; typically $0.02–$0.40 per run, capped at $0.75. ${fmtCost(state.remaining)} left in the demo budget.`;
     if (current && !current.mock) {
-      note.innerHTML = liveReady()
-        ? "<b>Live model.</b> This run uses the real model and is metered against the budget."
-        : "<b>Live model.</b> This scenario needs the demo password; you will be asked for it when you run.";
+      note.innerHTML = liveReady() ? billed
+        : "<b>Live demo.</b> Runs on the real model and is billed to the demo budget. You will be asked for the demo password.";
       note.hidden = false;
     } else if (current) {
-      note.innerHTML = liveReady()
-        ? "Prototype scenario. Runs on the live model while LIVE is on."
-        : "Prototype scenario. Runs on the free scripted replay.";
+      note.innerHTML = liveReady() ? `Prototype on the live model. ${billed}`
+        : "<b>Free.</b> Prototype replays a recorded agent run on a real sandbox; no model is called.";
       note.hidden = false;
     } else {
       note.hidden = true;
     }
+    const live = !!(current && (!current.mock || liveReady()));
+    $("run").textContent = live ? "Run live →" : "Run agent →";
+    $("run-parallel").textContent = live ? "Run 3 live in parallel" : "Run 3 in parallel";
   }
   function currentNeedsLive() {
     const sc = state.scenarios.find((x) => x.id === state.scenario);

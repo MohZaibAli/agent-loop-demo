@@ -214,3 +214,23 @@ def test_stage_notes_present_and_toggle(page: Page, server: str):
     page.click("#notes-toggle")
     expect(notes.first).to_be_visible()
     assert page.console_errors == []
+
+
+def test_mode_is_explicit_and_report_drives_next_step(page: Page, server: str):
+    page.goto(server)
+    expect(page.locator("#run")).to_have_text("Run agent →")
+    expect(page.locator("#scenario-note")).to_contain_text("Free")
+    page.locator('.scenario[data-id="invoice_engine"]').click()
+    expect(page.locator("#run")).to_have_text("Run live →")
+    expect(page.locator("#scenario-note")).to_contain_text("billed")
+    page.locator('.scenario[data-id="listing_parser"]').click()
+    run_single(page, server)
+    expect(page.locator("#live-mode")).to_have_text("MOCK · SCRIPTED REPLAY · FREE")
+    expect(page.locator("#report-bill")).to_contain_text("nothing billed")
+    expect(page.locator("#next-action")).to_contain_text("Run the live demo")
+    page.click("#next-action")
+    expect(page.locator("#key-modal")).to_be_visible()
+    expect(page.locator("#key-modal .modal-text")).to_contain_text("billed")
+    page.click("[data-cancel-key]")
+    expect(page.locator('.scenario[data-id="invoice_engine"]')).to_have_attribute("aria-checked", "true")
+    assert page.console_errors == []
