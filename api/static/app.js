@@ -518,6 +518,8 @@
     openOverlay("parallel");
     const lanes = $("lanes");
     lanes.innerHTML = "";
+    const tabs = $("lane-tabs");
+    tabs.innerHTML = "";
 
     const res = await fetch("/runs/batch", { method: "POST", headers: headers(), body: JSON.stringify(runBody({ task, count: 3 })) });
     if (res.status === 403 && currentNeedsLive()) {
@@ -548,7 +550,20 @@
           <div class="row"><span class="k">COST</span><span class="cost">$0.000</span></div>
         </div>
         <div class="lane-body"><ol class="timeline"></ol><div class="lane-result" hidden></div></div>`;
+      if (i === 0) lane.classList.add("active-lane");
       lanes.appendChild(lane);
+      const tab = document.createElement("button");
+      tab.type = "button";
+      tab.className = "lane-tab";
+      tab.setAttribute("role", "tab");
+      tab.setAttribute("aria-selected", String(i === 0));
+      tab.dataset.state = "queued";
+      tab.innerHTML = `<span class="st"><span class="dot"></span>LANE ${i + 1}</span><span class="cost">$0.000</span>`;
+      tab.addEventListener("click", () => {
+        lanes.querySelectorAll(".lane").forEach((l) => l.classList.toggle("active-lane", l === lane));
+        tabs.querySelectorAll(".lane-tab").forEach((t) => t.setAttribute("aria-selected", String(t === tab)));
+      });
+      tabs.appendChild(tab);
       setLive(+1);
       const list = lane.querySelector(".timeline");
       const body = lane.querySelector(".lane-body");
@@ -562,9 +577,13 @@
         if (ev.type === "run_started") {
           lane.querySelector(".sbx").textContent = ev.sandbox_id;
           status.dataset.state = "running";
+          tab.dataset.state = "running";
           status.querySelector(".st").textContent = "RUNNING";
         }
-        if (ev.type === "usage") lane.querySelector(".cost").textContent = fmtCost(ev.cumulative.cost);
+        if (ev.type === "usage") {
+          lane.querySelector(".cost").textContent = fmtCost(ev.cumulative.cost);
+          tab.querySelector(".cost").textContent = fmtCost(ev.cumulative.cost);
+        }
         const next = pendingTextAfter(ev);
         if (next !== undefined) setPending(list, null);
         appendEvent(list, ev, pending, true);
@@ -578,6 +597,8 @@
         const s = !fin || fin.interrupted ? "interrupted" : fin.status;
         if (fin && fin.interrupted) fin = null;
         status.dataset.state = s;
+        tab.dataset.state = s;
+        if (fin) tab.querySelector(".cost").textContent = fmtCost(fin.cost);
         status.querySelector(".st").textContent = s.replace("_", " ").toUpperCase();
         if (fin) {
           lane.querySelector(".cost").textContent = fmtCost(fin.cost);

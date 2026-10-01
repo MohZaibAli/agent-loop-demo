@@ -92,9 +92,32 @@ def test_mobile_layout_single_column(page: Page, server: str):
     assert page.evaluate("document.documentElement.scrollWidth") <= 390
     grid = page.evaluate("getComputedStyle(document.querySelector('.live-grid')).gridTemplateColumns")
     assert len(grid.split()) == 1
-    # The overlay fills the viewport and the trace never overflows it horizontally.
+    # The overlay fills the viewport, the trace scrolls inside it, and nothing overflows horizontally.
     assert page.evaluate("document.querySelector('#live').getBoundingClientRect().width") == 390
     assert page.evaluate("const t=document.querySelector('.trace'); t.scrollWidth <= t.clientWidth + 1")
+    assert page.evaluate("const t=document.querySelector('.trace'); t.scrollHeight > t.clientHeight")
+    assert page.evaluate("document.querySelector('.trace').getBoundingClientRect().bottom") <= 844
+    # Compact instrumentation: the facts column collapses to a strip.
+    assert page.evaluate("getComputedStyle(document.querySelector('.facts')).display") == "flex"
+    assert page.evaluate("getComputedStyle(document.querySelector('#m-run')).display") == "none"
+
+
+def test_mobile_parallel_uses_lane_tabs(page: Page, server: str):
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto(server)
+    page.click("#run-parallel")
+    expect(page.locator(".lane-tab")).to_have_count(3)
+    expect(page.locator(".lane-tab").first).to_be_visible()
+    for i in range(3):
+        expect(page.locator(".lane").nth(i).locator(".status")).to_have_attribute("data-state", "complete", timeout=30_000)
+    expect(page.locator(".lane.active-lane")).to_have_count(1)
+    expect(page.locator(".lane").nth(1)).to_be_hidden()
+    page.locator(".lane-tab").nth(1).click()
+    expect(page.locator(".lane").nth(1)).to_be_visible()
+    expect(page.locator(".lane").nth(0)).to_be_hidden()
+    assert page.evaluate("document.documentElement.scrollWidth") <= 390
+    assert page.locator(".lane-tab[data-state='complete']").count() == 3
+    assert page.console_errors == []
 
 
 @pytest.mark.reduced_motion
