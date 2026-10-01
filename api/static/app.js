@@ -639,6 +639,9 @@
       tab.addEventListener("click", () => {
         lanes.querySelectorAll(".lane").forEach((l) => l.classList.toggle("active-lane", l === lane));
         tabs.querySelectorAll(".lane-tab").forEach((t) => t.setAttribute("aria-selected", String(t === tab)));
+        // A lane that was hidden could not scroll; open it pinned to its newest event.
+        const body = lane.querySelector(".lane-body");
+        requestAnimationFrame(() => { body.scrollTop = body.scrollHeight; });
       });
       tabs.appendChild(tab);
       setLive(+1);
@@ -648,6 +651,7 @@
       const pending = new Map();
       let follow = true;
       body.addEventListener("scroll", () => { follow = body.scrollHeight - body.scrollTop - body.clientHeight < 120; }, { passive: true });
+      tab.addEventListener("click", () => { follow = true; });
       const pin = () => { if (follow) requestAnimationFrame(() => body.scrollTo({ top: body.scrollHeight, behavior: reduceMotion ? "auto" : "smooth" })); };
       setPending(list, "Provisioning an isolated sandbox…");
       subscribe(runId, (ev) => {

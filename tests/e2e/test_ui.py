@@ -115,6 +115,12 @@ def test_mobile_parallel_uses_lane_tabs(page: Page, server: str):
     page.locator(".lane-tab").nth(1).click()
     expect(page.locator(".lane").nth(1)).to_be_visible()
     expect(page.locator(".lane").nth(0)).to_be_hidden()
+    page.wait_for_timeout(200)
+    # Switching tabs opens the lane pinned to its newest event.
+    assert page.evaluate("const b=document.querySelectorAll('.lane-body')[1]; b.scrollHeight - b.scrollTop - b.clientHeight < 4")
+    page.locator(".lane-tab").nth(2).click()
+    page.wait_for_timeout(200)
+    assert page.evaluate("const b=document.querySelectorAll('.lane-body')[2]; b.scrollHeight - b.scrollTop - b.clientHeight < 4")
     assert page.evaluate("document.documentElement.scrollWidth") <= 390
     assert page.locator(".lane-tab[data-state='complete']").count() == 3
     assert page.console_errors == []
