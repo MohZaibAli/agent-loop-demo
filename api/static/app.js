@@ -290,10 +290,27 @@
   }
 
   // ---------- overlays ----------
+  // Lock the page behind an overlay. iOS ignores overflow:hidden on body, so pin it in place.
+  let savedScroll = 0;
+  function lockPage(lock) {
+    if (lock && !document.body.classList.contains("has-overlay")) {
+      savedScroll = window.scrollY;
+      document.body.classList.add("has-overlay");
+      document.body.style.position = "fixed";
+      document.body.style.top = `-${savedScroll}px`;
+      document.body.style.width = "100%";
+    } else if (!lock && document.body.classList.contains("has-overlay")) {
+      document.body.classList.remove("has-overlay");
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
+      window.scrollTo(0, savedScroll);
+    }
+  }
   function openOverlay(id) {
     $("live").hidden = id !== "live";
     $("parallel").hidden = id !== "parallel";
-    document.body.classList.toggle("has-overlay", !!id);
+    lockPage(!!id);
   }
   document.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", () => openOverlay(null)));
   document.addEventListener("keydown", (e) => {
