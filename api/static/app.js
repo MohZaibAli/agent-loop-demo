@@ -6,10 +6,20 @@
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const STAGGER_MS = 40;
 
+  let storedKey = "", storedLive = false;
+  try {
+    storedKey = localStorage.getItem("demoKey") || "";
+    storedLive = localStorage.getItem("liveMode") === "1";
+  } catch (_) { /* private mode */ }
   const state = {
+    scenario: "listing_parser",
+    scenarios: [],
+    upload: null,
+    realAvailable: false,
     follow: true,       // auto-scroll to the newest event while the user stays near it
     programmatic: false,
-    demoKey: "",
+    demoKey: storedKey,
+    liveMode: storedLive,   // send the demo key (pay for a real model) or not
     provider: "mock",
     live: 0,          // number of in-flight runs
     counters: { turns: 0, tokens: 0, cost: 0 },
@@ -43,19 +53,22 @@
   }
 
   // ---------- follow the live step ----------
+  const trace = document.querySelector(".trace");
   function nearBottom() {
-    return window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 240;
+    return trace.scrollHeight - trace.scrollTop - trace.clientHeight < 160;
   }
-  window.addEventListener("scroll", () => {
+  trace.addEventListener("scroll", () => {
     if (state.programmatic) return;
     state.follow = nearBottom();
   }, { passive: true });
-  function reveal(el) {
-    if (!state.follow || !el) return;
+  function reveal() {
+    if (!state.follow) return;
     state.programmatic = true;
-    el.scrollIntoView({ block: "end", behavior: reduceMotion ? "auto" : "smooth" });
-    clearTimeout(reveal.t);
-    reveal.t = setTimeout(() => { state.programmatic = false; }, reduceMotion ? 50 : 500);
+    requestAnimationFrame(() => {
+      trace.scrollTo({ top: trace.scrollHeight, behavior: reduceMotion ? "auto" : "smooth" });
+      clearTimeout(reveal.t);
+      reveal.t = setTimeout(() => { state.programmatic = false; }, reduceMotion ? 50 : 500);
+    });
   }
   function collapseAll(list) {
     list.querySelectorAll(".ev-detail.open").forEach((d) => d.classList.remove("open"));
@@ -77,8 +90,9 @@
     try {
       const s = await (await fetch("/status")).json();
       state.lastModel = s.model;
+      state.realAvailable = !!s.real_available;
       $("foot-meta").textContent = `sandbox: ${s.sandbox_provider} · model: ${s.model}`;
-      setProviderLabel(s.llm_provider === "openrouter" ? "openrouter" : "mock");
+      syncMode();
     } catch (_) { /* ignore */ }
   }
   function setProviderLabel(p) {
@@ -109,11 +123,17 @@
       lastR = now;
     }
   });
-  $("demo-key").addEventListener("input", (e) => { state.demoKey = e.target.value.trim(); });
+  $("demo-key").value = state.demoKey;
+  $("demo-key").addEventListener("input", (e) => {
+    state.demoKey = e.target.value.trim();
+    try { localStorage.setItem("demoKey", state.demoKey); } catch (_) { /* ignore */ }
+    if (state.demoKey && !state.liveMode) { state.liveMode = true; try { localStorage.setItem("liveMode", "1"); } catch (_) { /* ignore */ } }
+    syncMode();
+  });
 
   function headers() {
     const h = { "Content-Type": "application/json" };
-    if (state.demoKey) h["X-Demo-Key"] = state.demoKey;
+    if (state.demoKey && state.liveMode) h["X-Demo-Key"] = state.demoKey;
     return h;
   }
 
@@ -264,6 +284,40 @@
     }
   }
 
+  // ---------- overlays ----------
+  function openOverlay(id) {
+    $("live").hidden = id !== "live";
+    $("parallel").hidden = id !== "parallel";
+    document.body.classList.toggle("has-overlay", !!id);
+  }
+  document.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", () => openOverlay(null)));
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !state.live) openOverlay(null); });
+
+  // ---------- pending indicator ("what is it doing right now") ----------
+  function setPending(list, text) {
+    let row = list.querySelector(".ev.pending");
+    if (!text) { if (row) row.remove(); return; }
+    if (!row) {
+      row = document.createElement("li");
+      row.className = "ev pending";
+      row.dataset.kind = "pending";
+      row.innerHTML = `<div class="ev-head">AGENT</div><div class="ev-body"></div>`;
+    }
+    row.querySelector(".ev-body").textContent = text;
+    list.appendChild(row); // always last
+  }
+  function pendingTextAfter(ev) {
+    switch (ev.type) {
+      case "run_started": return "Reading the task…";
+      case "tool_call": return null;            // the tool row itself shows "running…"
+      case "tool_result": return "Thinking about the result…";
+      case "assistant_text": return null;
+      case "model_routed": return "Thinking…";
+      case "usage": return undefined;           // leave as is
+      default: return null;
+    }
+  }
+
   // ---------- SSE ----------
   function subscribe(runId, onEvent, onDone) {
     const es = new EventSource(`/runs/${runId}/events`);
@@ -286,8 +340,8 @@
   }
 
   async function startRun(task) {
-    $("live").hidden = false;
-    $("parallel").hidden = true;
+    openOverlay("live");
+    $("live-task").textContent = task;
     $("timeline").innerHTML = "";
     $("report").hidden = true;
     counterCache.clear();
@@ -297,13 +351,30 @@
     $("m-provider").textContent = "—";
     setStatus("queued");
     state.follow = true;
-    $("live").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+    setPending($("timeline"), "Provisioning an isolated sandbox…");
 
     let res;
     try {
-      res = await fetch("/runs", { method: "POST", headers: headers(), body: JSON.stringify({ task }) });
+      if (state.upload) {
+        const fd = new FormData();
+        fd.append("task", task);
+        fd.append("repo", state.upload);
+        const h = headers(); delete h["Content-Type"];
+        res = await fetch("/runs/upload", { method: "POST", headers: h, body: fd });
+      } else {
+        res = await fetch("/runs", { method: "POST", headers: headers(), body: JSON.stringify({ task, scenario: state.scenario }) });
+      }
     } catch (err) { setStatus("error"); return; }
-    if (!res.ok) { setStatus("error"); $("m-run").textContent = `HTTP ${res.status}`; return; }
+    if (!res.ok) {
+      setStatus("error");
+      $("m-run").textContent = `HTTP ${res.status}`;
+      let detail = `HTTP ${res.status}`;
+      try { detail = (await res.json()).detail || detail; } catch (_) { /* keep */ }
+      showError(typeof detail === "string" ? detail : JSON.stringify(detail));
+      openOverlay(null);
+      return;
+    }
+    clearError();
     const { run_id, provider } = await res.json();
     $("m-run").textContent = run_id;
     $("m-provider").textContent = provider;
@@ -323,9 +394,15 @@
         setCounter("m-tokens", ev.cumulative.total_tokens, (v) => fmtInt(Math.round(v)));
         setCounter("m-cost", ev.cumulative.cost, fmtCost);
       }
-      const row = appendEvent($("timeline"), ev, pending, false);
-      reveal(row);
+      const list = $("timeline");
+      const next = pendingTextAfter(ev);
+      if (next !== undefined) setPending(list, null);
+      appendEvent(list, ev, pending, false);
+      if (next) setPending(list, next);
+      else if (ev.type === "assistant_text" && !list.querySelector(".ev.active")) setPending(list, "Deciding the next step…");
+      reveal();
     }, (fin) => {
+      setPending($("timeline"), null);
       setLive(-1);
       refreshBudget();
       if (!fin) { setStatus("error"); return; }
@@ -334,7 +411,8 @@
       setCounter("m-tokens", fin.tokens, (v) => fmtInt(Math.round(v)));
       setCounter("m-cost", fin.cost, fmtCost);
       showReport(fin);
-      reveal($("report"));
+      // Final pin: a burst of smooth scrolls can stop short, so settle at the bottom once.
+      if (state.follow) setTimeout(() => { trace.scrollTop = trace.scrollHeight; }, reduceMotion ? 0 : 320);
     });
   }
 
@@ -348,14 +426,19 @@
 
   // ---------- parallel ----------
   async function startParallel(task) {
-    $("parallel").hidden = false;
-    $("live").hidden = true;
+    openOverlay("parallel");
     const lanes = $("lanes");
     lanes.innerHTML = "";
-    $("parallel").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
 
-    const res = await fetch("/runs/batch", { method: "POST", headers: headers(), body: JSON.stringify({ task, count: 3 }) });
-    if (!res.ok) return;
+    const res = await fetch("/runs/batch", { method: "POST", headers: headers(), body: JSON.stringify({ task, count: 3, scenario: state.scenario }) });
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`;
+      try { detail = (await res.json()).detail || detail; } catch (_) { /* keep */ }
+      showError(typeof detail === "string" ? detail : JSON.stringify(detail));
+      openOverlay(null);
+      return;
+    }
+    clearError();
     const { run_ids, provider } = await res.json();
     setProviderLabel(provider);
 
@@ -369,13 +452,17 @@
           <div class="row"><span class="k">SANDBOX</span><span class="sbx">—</span></div>
           <div class="row"><span class="k">COST</span><span class="cost">$0.000</span></div>
         </div>
-        <ol class="timeline"></ol>
-        <div class="lane-result" hidden></div>`;
+        <div class="lane-body"><ol class="timeline"></ol><div class="lane-result" hidden></div></div>`;
       lanes.appendChild(lane);
       setLive(+1);
       const list = lane.querySelector(".timeline");
+      const body = lane.querySelector(".lane-body");
       const status = lane.querySelector(".status");
       const pending = new Map();
+      let follow = true;
+      body.addEventListener("scroll", () => { follow = body.scrollHeight - body.scrollTop - body.clientHeight < 120; }, { passive: true });
+      const pin = () => { if (follow) requestAnimationFrame(() => body.scrollTo({ top: body.scrollHeight, behavior: reduceMotion ? "auto" : "smooth" })); };
+      setPending(list, "Provisioning an isolated sandbox…");
       subscribe(runId, (ev) => {
         if (ev.type === "run_started") {
           lane.querySelector(".sbx").textContent = ev.sandbox_id;
@@ -383,8 +470,14 @@
           status.querySelector(".st").textContent = "RUNNING";
         }
         if (ev.type === "usage") lane.querySelector(".cost").textContent = fmtCost(ev.cumulative.cost);
+        const next = pendingTextAfter(ev);
+        if (next !== undefined) setPending(list, null);
         appendEvent(list, ev, pending, true);
+        if (next) setPending(list, next);
+        pin();
       }, (fin) => {
+        setPending(list, null);
+        pin();
         setLive(-1);
         refreshBudget();
         const s = fin ? fin.status : "error";
@@ -400,6 +493,76 @@
       });
     });
   }
+
+  // ---------- scenarios ----------
+  const liveReady = () => state.realAvailable && !!state.demoKey && state.liveMode;
+  function syncMode() {
+    const btn = $("mode");
+    btn.hidden = !(state.realAvailable && state.demoKey);
+    btn.setAttribute("aria-pressed", String(liveReady()));
+    setProviderLabel(liveReady() ? "openrouter" : "mock");
+    renderScenarios();
+  }
+  $("mode").addEventListener("click", () => {
+    state.liveMode = !state.liveMode;
+    try { localStorage.setItem("liveMode", state.liveMode ? "1" : "0"); } catch (_) { /* ignore */ }
+    syncMode();
+  });
+  async function loadScenarios() {
+    try { state.scenarios = await (await fetch("/scenarios")).json(); } catch (_) { state.scenarios = []; }
+    renderScenarios();
+  }
+  function renderScenarios() {
+    const box = $("scenarios");
+    box.innerHTML = "";
+    for (const sc of state.scenarios) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "scenario";
+      b.setAttribute("role", "radio");
+      b.setAttribute("aria-checked", String(state.scenario === sc.id && !state.upload));
+      b.dataset.id = sc.id;
+      const needsLive = !sc.mock && !liveReady();
+      b.innerHTML = `<span class="mark">${state.scenario === sc.id && !state.upload ? "●" : "○"}</span>
+        <span class="name">${esc(sc.title)}${needsLive ? '<span class="live">LIVE MODEL</span>' : ""}</span>
+        <span class="shape">${esc(sc.shape)}</span>`;
+      b.addEventListener("click", () => {
+        state.scenario = sc.id;
+        state.upload = null;
+        taskEl.value = sc.task;
+        autosize();
+        renderScenarios();
+        clearError();
+      });
+      box.appendChild(b);
+    }
+    const up = document.createElement("label");
+    up.className = "scenario upload";
+    up.setAttribute("role", "radio");
+    up.setAttribute("aria-checked", String(!!state.upload));
+    up.innerHTML = `<span class="mark">${state.upload ? "●" : "○"}</span>
+      <span class="name">Upload a repository${liveReady() ? "" : '<span class="live">LIVE MODEL</span>'}
+        <span class="file${state.upload ? " set" : ""}">${state.upload ? esc(state.upload.name) : ".zip · python project with tests"}</span></span>
+      <input type="file" accept=".zip,application/zip" id="repo-zip">`;
+    up.querySelector("input").addEventListener("change", (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      state.upload = f;
+      if (!taskEl.value.trim() || state.scenarios.some((sc) => sc.task === taskEl.value.trim())) {
+        taskEl.value = "Run the tests, fix every failure you find, and verify the suite passes.";
+        autosize();
+      }
+      renderScenarios();
+      clearError();
+    });
+    box.appendChild(up);
+  }
+  function showError(msg) {
+    let el = document.querySelector(".workbench-error");
+    if (!el) { el = document.createElement("p"); el.className = "workbench-error"; $("task-form").appendChild(el); }
+    el.textContent = msg;
+  }
+  function clearError() { const el = document.querySelector(".workbench-error"); if (el) el.remove(); }
 
   // ---------- wiring ----------
   const taskEl = $("task");
@@ -421,4 +584,5 @@
   autosize();
   refreshBudget();
   refreshStatus();
+  loadScenarios();
 })();

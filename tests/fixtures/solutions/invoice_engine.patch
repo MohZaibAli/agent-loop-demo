@@ -1,0 +1,45 @@
+diff -ruN -x __pycache__ -x .pytest_cache a/invoices/totals.py b/invoices/totals.py
+--- a/invoices/totals.py	2026-10-01 14:53:48.655157194 +0000
++++ b/invoices/totals.py	2026-10-01 14:53:48.657391023 +0000
+@@ -1,6 +1,6 @@
+ """Invoice arithmetic. All money is Decimal and rounded half-up to cents."""
+ 
+-from decimal import Decimal
++from decimal import ROUND_HALF_UP, Decimal
+ 
+ from .models import Invoice, LineItem
+ 
+@@ -9,7 +9,7 @@
+ 
+ def money(value: Decimal) -> Decimal:
+     """Round to cents, half-up (0.125 -> 0.13)."""
+-    return value.quantize(CENT)
++    return value.quantize(CENT, rounding=ROUND_HALF_UP)
+ 
+ 
+ def line_subtotal(item: LineItem) -> Decimal:
+@@ -21,9 +21,8 @@
+ 
+ def invoice_total(invoice: Invoice) -> dict[str, Decimal]:
+     """Return subtotal, tax, credit applied and the amount due."""
+-    gross = sum((money(i.unit_price * i.quantity) for i in invoice.items), Decimal(0))
+-    tax = money(gross * invoice.tax_rate)
+     subtotal = sum((line_subtotal(i) for i in invoice.items), Decimal(0))
++    tax = money(subtotal * invoice.tax_rate)
+     gross_total = subtotal + tax
+     credit_used, due = apply_credit(gross_total, invoice.credits)
+     return {"subtotal": subtotal, "tax": tax, "credit": credit_used, "due": due}
+@@ -35,4 +34,12 @@
+     Returns (credit_used, amount_due). Credit is never over-applied: the due
+     amount never goes below zero and unused credit is simply not consumed.
+     """
+-    raise NotImplementedError("credits are not supported yet")
++    used = Decimal(0)
++    remaining = amount
++    for credit in credits:
++        if remaining <= 0:
++            break
++        take = min(credit, remaining)
++        used += take
++        remaining -= take
++    return money(used), money(remaining)

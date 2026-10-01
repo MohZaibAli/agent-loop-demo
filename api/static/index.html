@@ -17,6 +17,9 @@
   <div class="topbar-right">
     <input id="demo-key" class="demo-key" type="password" autocomplete="off" spellcheck="false"
            placeholder="demo key" aria-label="Demo key" hidden>
+    <button id="mode" class="mode" type="button" hidden aria-pressed="false" title="Toggle between the free scripted replay and the paid live model">
+      <span class="mode-opt" data-m="mock">MOCK</span><span class="mode-opt" data-m="live">LIVE</span>
+    </button>
     <span id="provider-label" class="provider-label" data-provider="mock">MOCK</span>
     <span id="budget" class="budget"><span id="budget-remaining">$4.000</span> remaining</span>
   </div>
@@ -31,6 +34,8 @@
       the repository, edits it, and proves the fix by running the tests — as a node in your workflow.</p>
 
     <form id="task-form" class="workbench" autocomplete="off">
+      <p class="workbench-label">REPOSITORY</p>
+      <div id="scenarios" class="scenarios" role="radiogroup" aria-label="Repository"></div>
       <label class="workbench-label" for="task">TASK</label>
       <div class="workbench-input">
         <span class="prompt" aria-hidden="true">›</span>
@@ -39,13 +44,17 @@
       <div class="workbench-actions">
         <button id="run" type="submit" class="btn btn-primary">Run agent →</button>
         <button id="run-parallel" type="button" class="btn btn-secondary">Run 3 in parallel</button>
-        <span class="workbench-meta">seed: <code>listing_parser</code> · 2 failing tests · cap <code>$0.25</code> / run</span>
+        <span id="workbench-meta" class="workbench-meta">cap <code>$0.25</code> / run</span>
       </div>
     </form>
   </section>
 
-  <section id="live" class="live" hidden>
-    <p class="label">02 — LIVE RUN</p>
+  <section id="live" class="overlay live" hidden aria-modal="true" role="dialog" aria-label="Live run">
+    <header class="overlay-head">
+      <p class="label">02 — LIVE RUN</p>
+      <p id="live-task" class="overlay-task mono"></p>
+      <button type="button" class="btn btn-close" data-close="live">Close ✕</button>
+    </header>
     <div class="live-grid">
       <div class="trace">
         <ol id="timeline" class="timeline" aria-live="polite"></ol>
@@ -76,9 +85,12 @@
     </div>
   </section>
 
-  <section id="parallel" class="parallel" hidden>
-    <p class="label">03 — PARALLEL RUNS</p>
-    <p class="lede small">Three agents, three sandboxes, one task. Each lane is an independent execution trace.</p>
+  <section id="parallel" class="overlay parallel" hidden aria-modal="true" role="dialog" aria-label="Parallel runs">
+    <header class="overlay-head">
+      <p class="label">03 — PARALLEL RUNS</p>
+      <p class="overlay-task">Three agents · three sandboxes · one task</p>
+      <button type="button" class="btn btn-close" data-close="parallel">Close ✕</button>
+    </header>
     <div id="lanes" class="lanes"></div>
   </section>
 </main>

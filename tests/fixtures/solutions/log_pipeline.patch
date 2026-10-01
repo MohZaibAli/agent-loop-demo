@@ -1,0 +1,33 @@
+diff -ruN -x __pycache__ -x .pytest_cache a/logpipe/metrics.py b/logpipe/metrics.py
+--- a/logpipe/metrics.py	2026-10-01 14:53:48.667849776 +0000
++++ b/logpipe/metrics.py	2026-10-01 14:53:48.669768862 +0000
+@@ -25,5 +25,5 @@
+ def top_services(lines: list[LogLine], n: int = 3) -> list[tuple[str, float]]:
+     """The n services with the highest error rate, worst first; ties by name."""
+     rates = error_rates(lines)
+-    ranked = sorted(rates.items(), key=lambda kv: kv[1])
++    ranked = sorted(rates.items(), key=lambda kv: (-kv[1], kv[0]))
+     return ranked[:n]
+diff -ruN -x __pycache__ -x .pytest_cache a/logpipe/parser.py b/logpipe/parser.py
+--- a/logpipe/parser.py	2026-10-01 14:53:48.667833214 +0000
++++ b/logpipe/parser.py	2026-10-01 14:53:48.669748594 +0000
+@@ -25,7 +25,11 @@
+ 
+ def parse_timestamp(raw: str) -> datetime:
+     """ISO-8601; a trailing Z means UTC. Naive timestamps are treated as UTC."""
+-    ts = datetime.fromisoformat(raw.rstrip("Z"))
++    if raw.endswith("Z"):
++        raw = raw[:-1] + "+00:00"
++    ts = datetime.fromisoformat(raw)
++    if ts.tzinfo is None:
++        ts = ts.replace(tzinfo=timezone.utc)
+     return ts
+ 
+ 
+@@ -42,5 +46,5 @@
+             status=int(fields["status"]),
+             ms=int(fields.get("ms", 0)),
+         )
+-    except KeyError:
++    except (KeyError, ValueError):
+         return None

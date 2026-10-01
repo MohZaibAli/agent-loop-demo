@@ -19,6 +19,7 @@ class Run:
     id: str
     task: str
     provider: str
+    scenario: str = "listing_parser"
     created_at: float = field(default_factory=time.time)
     events: EventLog = field(default_factory=EventLog)
     result: RunResult | None = None
@@ -39,6 +40,7 @@ class Run:
     def to_dict(self) -> dict[str, Any]:
         return {
             "run_id": self.id, "task": self.task, "status": self.status, "provider": self.provider,
+            "scenario": self.scenario,
             "created_at": self.created_at, "sandbox_id": self.sandbox.sandbox_id if self.sandbox else None,
             "events": len(self.events.events), **({"result": self.result.to_dict()} if self.result else {}),
         }

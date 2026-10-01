@@ -61,23 +61,26 @@ def test_screenshots_desktop_and_mobile(page: Page, server: str):
     run_single(page, server)
     page.evaluate("window.scrollTo(0, 0)")
     page.wait_for_timeout(600)
-    page.screenshot(path=str(SCREENSHOTS / "run-1440.png"), full_page=True)
+    page.screenshot(path=str(SCREENSHOTS / "run-1440.png"))
+    page.click('[data-close="live"]')
+    expect(page.locator("#live")).to_be_hidden()
     page.click("#run-parallel")
     for i in range(3):
         expect(page.locator(".lane").nth(i).locator(".status")).to_have_attribute("data-state", "complete", timeout=30_000)
     page.evaluate("window.scrollTo(0, 0)")
     page.wait_for_timeout(600)
-    page.screenshot(path=str(SCREENSHOTS / "parallel-1440.png"), full_page=True)
+    page.screenshot(path=str(SCREENSHOTS / "parallel-1440.png"))
 
     page.set_viewport_size({"width": 390, "height": 844})
-    page.evaluate("window.scrollTo(0, 0)")
     page.wait_for_timeout(300)
-    page.screenshot(path=str(SCREENSHOTS / "parallel-390.png"), full_page=True)
+    page.screenshot(path=str(SCREENSHOTS / "parallel-390.png"))
+    page.click('[data-close="parallel"]')
+    page.wait_for_timeout(300)
+    page.screenshot(path=str(SCREENSHOTS / "hero-390.png"), full_page=True)
     page.click("#run")
     expect(page.locator("#m-status")).to_have_attribute("data-state", "complete", timeout=30_000)
-    page.evaluate("window.scrollTo(0, 0)")
     page.wait_for_timeout(600)
-    page.screenshot(path=str(SCREENSHOTS / "run-390.png"), full_page=True)
+    page.screenshot(path=str(SCREENSHOTS / "run-390.png"))
     # No horizontal overflow at 390px.
     assert page.evaluate("document.documentElement.scrollWidth") <= 390
     assert page.console_errors == []
@@ -89,7 +92,9 @@ def test_mobile_layout_single_column(page: Page, server: str):
     assert page.evaluate("document.documentElement.scrollWidth") <= 390
     grid = page.evaluate("getComputedStyle(document.querySelector('.live-grid')).gridTemplateColumns")
     assert len(grid.split()) == 1
-    assert page.evaluate("getComputedStyle(document.querySelector('#instrument')).position") == "static"
+    # The overlay fills the viewport and the trace never overflows it horizontally.
+    assert page.evaluate("document.querySelector('#live').getBoundingClientRect().width") == 390
+    assert page.evaluate("const t=document.querySelector('.trace'); t.scrollWidth <= t.clientWidth + 1")
 
 
 @pytest.mark.reduced_motion
@@ -125,3 +130,35 @@ def test_live_step_focus_collapses_previous_output(page: Page, server: str):
     last_tool = page.locator('#timeline .ev[data-kind="tool_call"]').last
     expect(last_tool.locator(".res")).to_contain_text("8 passed")
     assert page.console_errors == []
+
+
+def test_overlay_opens_and_closes(page: Page, server: str):
+    run_single(page, server)
+    expect(page.locator("#live")).to_have_attribute("role", "dialog")
+    assert page.evaluate("document.body.classList.contains('has-overlay')")
+    # Trace is pinned at the bottom after the run.
+    page.wait_for_timeout(600)
+    assert page.evaluate("const t=document.querySelector('.trace'); t.scrollHeight - t.scrollTop - t.clientHeight < 160")
+    page.keyboard.press("Escape")
+    expect(page.locator("#live")).to_be_hidden()
+    assert page.console_errors == []
+
+
+def test_scenario_picker_fills_task_and_gates_live_cases(page: Page, server: str):
+    page.goto(server)
+    expect(page.locator("#scenarios .scenario")).to_have_count(4)  # 3 seeds + upload
+    page.locator('.scenario[data-id="invoice_engine"]').click()
+    expect(page.locator("#task")).to_have_value(re.compile("apply_credit"))
+    expect(page.locator('.scenario[data-id="invoice_engine"] .live')).to_have_text("LIVE MODEL")
+    page.click("#run")
+    expect(page.locator(".workbench-error")).to_contain_text("live model")
+    expect(page.locator("#live")).to_be_hidden()
+    page.locator('.scenario[data-id="listing_parser"]').click()
+    expect(page.locator("#task")).to_have_value("Fix the parser so all tests pass")
+    assert [e for e in page.console_errors if "400" not in e] == []  # the 400 is the expected gate
+
+
+def test_mode_toggle_hidden_without_live_key(page: Page, server: str):
+    page.goto(server)
+    expect(page.locator("#mode")).to_be_hidden()
+    expect(page.locator("#provider-label")).to_have_text("MOCK")

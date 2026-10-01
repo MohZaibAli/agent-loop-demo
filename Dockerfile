@@ -10,6 +10,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY agent ./agent
 COPY api ./api
 COPY seed_repo ./seed_repo
+COPY scenarios ./scenarios
 COPY tests/fixtures ./tests/fixtures
 COPY scripts ./scripts
 COPY config.yaml ./
