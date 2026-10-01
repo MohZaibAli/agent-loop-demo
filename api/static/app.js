@@ -14,7 +14,6 @@
   const state = {
     scenario: "listing_parser",
     scenarios: [],
-    upload: null,
     realAvailable: false,
     follow: true,       // auto-scroll to the newest event while the user stays near it
     programmatic: false,
@@ -291,7 +290,11 @@
     document.body.classList.toggle("has-overlay", !!id);
   }
   document.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", () => openOverlay(null)));
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !state.live) openOverlay(null); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    if (!$("key-modal").hidden) { closeKeyDialog(false); return; }
+    if (!state.live) openOverlay(null);
+  });
 
   // ---------- pending indicator ("what is it doing right now") ----------
   function setPending(list, text) {
@@ -355,16 +358,15 @@
 
     let res;
     try {
-      if (state.upload) {
-        const fd = new FormData();
-        fd.append("task", task);
-        fd.append("repo", state.upload);
-        const h = headers(); delete h["Content-Type"];
-        res = await fetch("/runs/upload", { method: "POST", headers: h, body: fd });
-      } else {
-        res = await fetch("/runs", { method: "POST", headers: headers(), body: JSON.stringify({ task, scenario: state.scenario }) });
-      }
+      res = await fetch("/runs", { method: "POST", headers: headers(), body: JSON.stringify({ task, scenario: state.scenario }) });
     } catch (err) { setStatus("error"); return; }
+    if (res.status === 403 && currentNeedsLive()) {
+      // Wrong or stale password: ask again and retry once accepted.
+      openOverlay(null);
+      forgetKey();
+      if (await askForKey("That password was not accepted. Try again.")) startRun(task);
+      return;
+    }
     if (!res.ok) {
       setStatus("error");
       $("m-run").textContent = `HTTP ${res.status}`;
@@ -431,6 +433,12 @@
     lanes.innerHTML = "";
 
     const res = await fetch("/runs/batch", { method: "POST", headers: headers(), body: JSON.stringify({ task, count: 3, scenario: state.scenario }) });
+    if (res.status === 403 && currentNeedsLive()) {
+      openOverlay(null);
+      forgetKey();
+      if (await askForKey("That password was not accepted. Try again.")) startParallel(task);
+      return;
+    }
     if (!res.ok) {
       let detail = `HTTP ${res.status}`;
       try { detail = (await res.json()).detail || detail; } catch (_) { /* keep */ }
@@ -520,15 +528,13 @@
       b.type = "button";
       b.className = "scenario";
       b.setAttribute("role", "radio");
-      b.setAttribute("aria-checked", String(state.scenario === sc.id && !state.upload));
+      b.setAttribute("aria-checked", String(state.scenario === sc.id));
       b.dataset.id = sc.id;
-      const needsLive = !sc.mock && !liveReady();
-      b.innerHTML = `<span class="mark">${state.scenario === sc.id && !state.upload ? "●" : "○"}</span>
-        <span class="name">${esc(sc.title)}${needsLive ? '<span class="live">LIVE MODEL</span>' : ""}</span>
+      b.innerHTML = `<span class="mark">${state.scenario === sc.id ? "●" : "○"}</span>
+        <span class="name">${esc(sc.title)}${sc.mock ? "" : '<span class="live">LIVE DEMO</span>'}</span>
         <span class="shape">${esc(sc.shape)}</span>`;
       b.addEventListener("click", () => {
         state.scenario = sc.id;
-        state.upload = null;
         taskEl.value = sc.task;
         autosize();
         renderScenarios();
@@ -536,27 +542,65 @@
       });
       box.appendChild(b);
     }
-    const up = document.createElement("label");
-    up.className = "scenario upload";
-    up.setAttribute("role", "radio");
-    up.setAttribute("aria-checked", String(!!state.upload));
-    up.innerHTML = `<span class="mark">${state.upload ? "●" : "○"}</span>
-      <span class="name">Upload a repository${liveReady() ? "" : '<span class="live">LIVE MODEL</span>'}
-        <span class="file${state.upload ? " set" : ""}">${state.upload ? esc(state.upload.name) : ".zip · python project with tests"}</span></span>
-      <input type="file" accept=".zip,application/zip" id="repo-zip">`;
-    up.querySelector("input").addEventListener("change", (e) => {
-      const f = e.target.files[0];
-      if (!f) return;
-      state.upload = f;
-      if (!taskEl.value.trim() || state.scenarios.some((sc) => sc.task === taskEl.value.trim())) {
-        taskEl.value = "Run the tests, fix every failure you find, and verify the suite passes.";
-        autosize();
-      }
-      renderScenarios();
-      clearError();
-    });
-    box.appendChild(up);
+    const current = state.scenarios.find((sc) => sc.id === state.scenario);
+    const note = $("scenario-note");
+    if (current && !current.mock) {
+      note.innerHTML = liveReady()
+        ? "<b>Live model.</b> This run uses the real model and is metered against the budget."
+        : "<b>Live model.</b> This scenario needs the demo password; you will be asked for it when you run.";
+      note.hidden = false;
+    } else if (current) {
+      note.innerHTML = liveReady()
+        ? "Prototype scenario. Runs on the live model while LIVE is on."
+        : "Prototype scenario. Runs on the free scripted replay.";
+      note.hidden = false;
+    } else {
+      note.hidden = true;
+    }
   }
+  function currentNeedsLive() {
+    const sc = state.scenarios.find((x) => x.id === state.scenario);
+    return !!sc && !sc.mock;
+  }
+
+  // ---------- demo password dialog ----------
+  let keyResolve = null;
+  function askForKey(error) {
+    $("key-error").hidden = !error;
+    $("key-error").textContent = error || "";
+    $("key-input").value = "";
+    $("key-modal").hidden = false;
+    $("key-input").focus();
+    return new Promise((resolve) => { keyResolve = resolve; });
+  }
+  function closeKeyDialog(value) {
+    $("key-modal").hidden = true;
+    const r = keyResolve; keyResolve = null;
+    if (r) r(value);
+  }
+  $("key-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const v = $("key-input").value.trim();
+    if (!v) { $("key-input").focus(); return; }
+    state.demoKey = v;
+    state.liveMode = true;
+    try { localStorage.setItem("demoKey", v); localStorage.setItem("liveMode", "1"); } catch (_) { /* ignore */ }
+    syncMode();
+    closeKeyDialog(true);
+  });
+  document.querySelector("[data-cancel-key]").addEventListener("click", () => closeKeyDialog(false));
+  /** Make sure a live scenario has a password before starting; returns false if the user cancelled. */
+  async function ensureAccess() {
+    if (!currentNeedsLive() || (state.demoKey && state.liveMode)) return true;
+    return askForKey(null);
+  }
+  function forgetKey() {
+    state.demoKey = "";
+    state.liveMode = false;
+    try { localStorage.removeItem("demoKey"); localStorage.setItem("liveMode", "0"); } catch (_) { /* ignore */ }
+    syncMode();
+  }
+
   function showError(msg) {
     let el = document.querySelector(".workbench-error");
     if (!el) { el = document.createElement("p"); el.className = "workbench-error"; $("task-form").appendChild(el); }
@@ -571,14 +615,14 @@
   taskEl.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("task-form").requestSubmit(); }
   });
-  $("task-form").addEventListener("submit", (e) => {
+  $("task-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const task = taskEl.value.trim();
-    if (task && !state.live) startRun(task);
+    if (task && !state.live && await ensureAccess()) startRun(task);
   });
-  $("run-parallel").addEventListener("click", () => {
+  $("run-parallel").addEventListener("click", async () => {
     const task = taskEl.value.trim();
-    if (task && !state.live) startParallel(task);
+    if (task && !state.live && await ensureAccess()) startParallel(task);
   });
 
   autosize();

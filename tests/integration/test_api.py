@@ -140,49 +140,30 @@ async def test_status_endpoint(client):
     assert body["real_available"] is False
 
 
-# --- scenarios and uploads -----------------------------------------------------
-
-def _zip_bytes() -> bytes:
-    import io
-    import zipfile
-
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w") as z:
-        z.writestr("proj/mod.py", "def f():\n    return 1\n")
-        z.writestr("proj/test_mod.py", "from mod import f\n\ndef test_f():\n    assert f() == 2\n")
-    return buf.getvalue()
-
+# --- scenarios -----------------------------------------------------------------
 
 async def test_scenarios_endpoint(client):
     body = (await client.get("/scenarios")).json()
     assert [s["id"] for s in body] == ["listing_parser", "invoice_engine", "log_pipeline"]
+    assert [s["mock"] for s in body] == [True, False, False]
 
 
-async def test_mock_gates_non_scripted_scenarios(client):
+async def test_mock_gates_live_scenarios_with_403(client):
     r = await client.post("/runs", json={"task": "t", "scenario": "invoice_engine"})
-    assert r.status_code == 400 and "live model" in r.json()["detail"]
+    assert r.status_code == 403 and "demo password" in r.json()["detail"]
     r = await client.post("/runs/batch", json={"task": "t", "scenario": "log_pipeline", "count": 2})
-    assert r.status_code == 400
+    assert r.status_code == 403
     assert (await client.post("/runs", json={"task": "t", "scenario": "nope"})).status_code == 422
 
 
-async def test_upload_requires_live_and_validates_zip(client):
-    r = await client.post("/runs/upload", data={"task": "fix"}, files={"repo": ("r.zip", _zip_bytes(), "application/zip")})
-    assert r.status_code == 400 and "live model" in r.json()["detail"]
-    r = await client.post("/runs/upload", data={"task": "fix"}, files={"repo": ("r.zip", b"nope", "application/zip")})
-    assert r.status_code == 400 and "not a valid zip" in r.json()["detail"]
-
-
-async def test_live_scenario_and_upload_start_with_real_provider(client, monkeypatch):
+async def test_live_scenario_starts_with_real_provider(client, monkeypatch):
     monkeypatch.setenv("DEMO_KEY", "secret")
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-fake")
-    h = {"X-Demo-Key": "secret"}
-    r = await client.post("/runs?wait=true", json={"task": "t", "scenario": "invoice_engine"}, headers=h)
+    r = await client.post("/runs?wait=true", json={"task": "t", "scenario": "invoice_engine"},
+                          headers={"X-Demo-Key": "secret"})
     assert r.status_code == 200 and r.json()["provider"] == "openrouter"
     assert r.json()["status"] == "error"  # fake key: provider fails, workspace was still prepared
-    run = (await client.get(f"/runs/{r.json()['run_id']}")).json()
-    assert run["scenario"] == "invoice_engine"
-    r = await client.post("/runs/upload?wait=true", data={"task": "fix"}, headers=h,
-                          files={"repo": ("r.zip", _zip_bytes(), "application/zip")})
-    assert r.status_code == 200 and r.json()["provider"] == "openrouter"
-    assert (await client.get(f"/runs/{r.json()['run_id']}")).json()["scenario"] == "upload"
+    assert (await client.get(f"/runs/{r.json()['run_id']}")).json()["scenario"] == "invoice_engine"
+    # Wrong password on a live scenario is a 403, never a silent mock run.
+    r = await client.post("/runs", json={"task": "t", "scenario": "invoice_engine"}, headers={"X-Demo-Key": "nope"})
+    assert r.status_code == 403

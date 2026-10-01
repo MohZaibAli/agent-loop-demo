@@ -9,10 +9,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-import shutil
-from pathlib import Path
-
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -24,7 +21,7 @@ from agent.loop import run_agent
 from agent.providers import Provider, make_provider
 from agent.registry import Registry, Run
 from agent.sandbox import create_sandbox, sandbox_provider
-from agent.scenarios import DEFAULT_SCENARIO, SCENARIOS, BadUpload, extract_upload, list_scenarios, scenario_dir
+from agent.scenarios import DEFAULT_SCENARIO, SCENARIOS, list_scenarios, scenario_dir
 
 STATIC = Path(__file__).resolve().parent / "static"
 DEFAULTS = load_config()["defaults"]
@@ -92,38 +89,33 @@ def resolve_provider(request: Request) -> Provider:
     return make_provider("mock")
 
 
-def _workspace_for(body: RunRequest, provider: Provider, upload_dir: Path | None) -> Path:
-    """Seed directory for the run; only the scripted scenario is replayable in mock mode."""
-    if upload_dir is not None:
-        if provider.name == "mock":
-            raise HTTPException(400, "Uploaded repositories need the live model. Enter the demo key (press r twice).")
-        return upload_dir
+LIVE_REQUIRED = "This scenario runs on the live model. Enter the demo password to continue."
+
+
+def _workspace_for(body: RunRequest, provider: Provider):
+    """Seed directory for the run; only the prototype scenario is replayable in mock mode."""
     if body.scenario not in SCENARIOS:
         raise HTTPException(422, f"unknown scenario: {body.scenario}")
     if provider.name == "mock" and not SCENARIOS[body.scenario]["mock"]:
-        raise HTTPException(400, "This scenario needs the live model. Enter the demo key (press r twice).")
+        raise HTTPException(403, LIVE_REQUIRED)
     return scenario_dir(body.scenario)
 
 
-def _start_run(app: FastAPI, body: RunRequest, provider: Provider, upload_dir: Path | None = None) -> Run:
+def _start_run(app: FastAPI, body: RunRequest, provider: Provider) -> Run:
     registry: Registry = app.state.registry
-    seed = _workspace_for(body, provider, upload_dir)
+    seed = _workspace_for(body, provider)
     run = registry.create(body.task, provider.name)
-    run.scenario = "upload" if upload_dir else body.scenario
+    run.scenario = body.scenario
     factory = registry.sandbox_factory(
         run, lambda: create_sandbox(seed_dir=str(seed), ttl_s=DEFAULTS["sandbox_ttl_s"]))
 
     async def execute() -> None:
-        try:
-            async with registry.semaphore:
-                run.result = await run_agent(
-                    body.task, provider, factory, run.events, app.state.budget,
-                    max_turns=body.max_turns, max_cost_usd=body.max_cost_usd,
-                    timeout_s=DEFAULTS["run_timeout_s"], run_id=run.id,
-                )
-        finally:
-            if upload_dir is not None:
-                shutil.rmtree(upload_dir, ignore_errors=True)
+        async with registry.semaphore:
+            run.result = await run_agent(
+                body.task, provider, factory, run.events, app.state.budget,
+                max_turns=body.max_turns, max_cost_usd=body.max_cost_usd,
+                timeout_s=DEFAULTS["run_timeout_s"], run_id=run.id,
+            )
 
     run.task_handle = asyncio.create_task(execute())
     return run
@@ -133,33 +125,6 @@ def _start_run(app: FastAPI, body: RunRequest, provider: Provider, upload_dir: P
 async def create_run(body: RunRequest, request: Request, wait: bool = False) -> dict[str, Any]:
     provider = resolve_provider(request)
     run = _start_run(request.app, body, provider)
-    if not wait:
-        return {"run_id": run.id, "provider": provider.name}
-    await asyncio.shield(run.task_handle)
-    return {"run_id": run.id, "provider": provider.name, **run.result.to_dict()}
-
-
-@app.post("/runs/upload")
-async def create_run_from_upload(
-    request: Request,
-    task: str = Form(min_length=1, max_length=4000),
-    repo: UploadFile = File(...),
-    max_turns: int = Form(default=DEFAULTS["max_turns"], ge=1, le=50),
-    max_cost_usd: float = Form(default=DEFAULTS["max_cost_usd"], gt=0, le=1.0),
-    wait: bool = False,
-) -> dict[str, Any]:
-    """Like POST /runs, but the workspace is the uploaded zip instead of a seed scenario."""
-    provider = resolve_provider(request)
-    try:
-        upload_dir = extract_upload(await repo.read())
-    except BadUpload as exc:
-        raise HTTPException(400, str(exc)) from exc
-    body = RunRequest(task=task, max_turns=max_turns, max_cost_usd=max_cost_usd)
-    try:
-        run = _start_run(request.app, body, provider, upload_dir)
-    except HTTPException:
-        shutil.rmtree(upload_dir, ignore_errors=True)
-        raise
     if not wait:
         return {"run_id": run.id, "provider": provider.name}
     await asyncio.shield(run.task_handle)

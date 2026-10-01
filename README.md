@@ -55,13 +55,13 @@ rest of the run so Anthropic prompt caching keeps hitting. Set `MODEL_ROUTER=` (
 - **MOCK / LIVE.** Enter the demo key once (press `r` twice outside an input); the browser remembers it and a
   MOCK | LIVE switch appears in the top bar. LIVE sends `X-Demo-Key`, uses the real model and shows real
   timing and cost. MOCK replays the scripted run for free, paced by `MOCK_TURN_DELAY_S` so it reads like work.
-- **Repositories.** Three built-in cases (`agent/scenarios.py`): the watch-dealer parser (8 tests, 2 failing,
-  also the mock replay), invoice totals and credits (10 tests, 8 failing, one function to implement) and an
-  access-log metrics pipeline (9 tests, 6 failing). `tests/fixtures/solutions/` holds a reference patch for
-  each and the unit tests prove it turns the suite green.
-- **Upload.** `POST /runs/upload` (multipart `task` + `repo` zip, 25 MB max) runs the agent on any small
-  Python project with tests. Uploads and the two harder cases need LIVE; in MOCK the API returns 400 and the
-  UI says so.
+- **Repositories.** Three built-in cases (`agent/scenarios.py`). The watch-dealer parser (8 tests, 2 failing)
+  is the prototype and the mock replay. Invoice totals and credits (10 tests, 8 failing, one function to
+  implement) and the access-log pipeline (9 tests, 6 failing) are the live demos: they only run on the real
+  model. Clicking Run on one of them opens a small dialog asking for the demo password; the browser remembers
+  it, and a wrong password re-opens the dialog. Without a valid `X-Demo-Key` the API answers `403`.
+  `tests/fixtures/solutions/` holds a reference patch for each live case and the unit tests prove it turns
+  the suite green.
 - **Run surfaces.** Single and parallel runs open as full-width overlays. The trace is pinned to its newest
   event like a chat, the active tool is highlighted, earlier output collapses, and a status row says what
   the agent is doing between events.
@@ -160,7 +160,6 @@ an unpriced model with no accounted cost is an error, never a guess.
 |---|---|
 | `POST /runs` | start a run; body `{task, scenario, max_turns, max_cost_usd}` → `{run_id}` |
 | `POST /runs?wait=true` | block until the run completes and return the final result (**the n8n node**) |
-| `POST /runs/upload` | multipart `task` + `repo` (zip): same as `POST /runs` on an uploaded workspace |
 | `POST /runs/batch` | `{task, scenario, count ≤ 3}` → three concurrent runs, three sandboxes |
 | `GET /scenarios` | the built-in repositories and their default tasks |
 | `GET /runs/{id}/events` | SSE: replays history, streams live events, closes on completion |

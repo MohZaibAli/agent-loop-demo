@@ -36,6 +36,7 @@
     <form id="task-form" class="workbench" autocomplete="off">
       <p class="workbench-label">REPOSITORY</p>
       <div id="scenarios" class="scenarios" role="radiogroup" aria-label="Repository"></div>
+      <p id="scenario-note" class="scenario-note" hidden></p>
       <label class="workbench-label" for="task">TASK</label>
       <div class="workbench-input">
         <span class="prompt" aria-hidden="true">›</span>
@@ -94,6 +95,19 @@
     <div id="lanes" class="lanes"></div>
   </section>
 </main>
+
+<div id="key-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="key-title">
+  <form id="key-form" class="modal-box" autocomplete="off">
+    <p class="label" id="key-title">DEMO ACCESS</p>
+    <p class="modal-text">This scenario runs on the live model. Enter the demo password to start the run.</p>
+    <input id="key-input" class="modal-input" type="password" placeholder="demo password" aria-label="Demo password" autocomplete="off" spellcheck="false">
+    <p id="key-error" class="modal-error" hidden></p>
+    <div class="modal-actions">
+      <button type="submit" class="btn btn-primary">Start run →</button>
+      <button type="button" class="btn btn-secondary" data-cancel-key>Cancel</button>
+    </div>
+  </form>
+</div>
 
 <footer class="foot">
   <span>Sandbox Agents<span class="asterisk">*</span> — a coding agent as a workflow node.</span>

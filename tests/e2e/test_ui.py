@@ -144,18 +144,32 @@ def test_overlay_opens_and_closes(page: Page, server: str):
     assert page.console_errors == []
 
 
-def test_scenario_picker_fills_task_and_gates_live_cases(page: Page, server: str):
+def test_scenario_picker_and_password_dialog(page: Page, server: str):
     page.goto(server)
-    expect(page.locator("#scenarios .scenario")).to_have_count(4)  # 3 seeds + upload
+    expect(page.locator("#scenarios .scenario")).to_have_count(3)
+    expect(page.locator("#scenario-note")).to_contain_text("Prototype")
     page.locator('.scenario[data-id="invoice_engine"]').click()
     expect(page.locator("#task")).to_have_value(re.compile("apply_credit"))
-    expect(page.locator('.scenario[data-id="invoice_engine"] .live')).to_have_text("LIVE MODEL")
+    expect(page.locator('.scenario[data-id="invoice_engine"] .live')).to_have_text("LIVE DEMO")
+    expect(page.locator("#scenario-note")).to_contain_text("demo password")
+    # Run is not blocked: it asks for the password instead.
     page.click("#run")
-    expect(page.locator(".workbench-error")).to_contain_text("live model")
+    expect(page.locator("#key-modal")).to_be_visible()
+    expect(page.locator("#key-input")).to_be_focused()
+    page.click("[data-cancel-key]")
+    expect(page.locator("#key-modal")).to_be_hidden()
     expect(page.locator("#live")).to_be_hidden()
+    # A wrong password is rejected by the server and the dialog comes back with an error.
+    page.click("#run")
+    page.fill("#key-input", "wrong-password")
+    page.click("#key-form button[type=submit]")
+    expect(page.locator("#key-modal")).to_be_visible()
+    expect(page.locator("#key-error")).to_contain_text("not accepted")
+    page.keyboard.press("Escape")
+    expect(page.locator("#key-modal")).to_be_hidden()
     page.locator('.scenario[data-id="listing_parser"]').click()
     expect(page.locator("#task")).to_have_value("Fix the parser so all tests pass")
-    assert [e for e in page.console_errors if "400" not in e] == []  # the 400 is the expected gate
+    assert [e for e in page.console_errors if "403" not in e] == []  # the 403 is the expected gate
 
 
 def test_mode_toggle_hidden_without_live_key(page: Page, server: str):
