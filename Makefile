@@ -2,7 +2,8 @@
 
 export LLM_PROVIDER ?= mock
 export SANDBOX_PROVIDER ?= local
-PW := PLAYWRIGHT_BROWSERS_PATH=$${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}
+# Use the preinstalled browsers when present (sandboxed dev containers); otherwise Playwright defaults.
+PW := $(if $(wildcard /opt/pw-browsers),PLAYWRIGHT_BROWSERS_PATH=$${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers},)
 
 install:
 	uv sync --group dev

@@ -21,8 +21,6 @@ jobs:
       - run: uv sync --group dev
       - run: uv run playwright install --with-deps chromium
       - run: make test
-        env:
-          PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright
       - uses: actions/upload-artifact@v4
         if: always()
         with:
