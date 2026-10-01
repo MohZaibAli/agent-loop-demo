@@ -1,0 +1,31 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+# No LLM or E2B credentials are ever provided to CI. All tests use the
+# scripted mock provider and the local sandbox.
+env:
+  LLM_PROVIDER: mock
+  SANDBOX_PROVIDER: local
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: uv sync --group dev
+      - run: uv run playwright install --with-deps chromium
+      - run: make test
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: tests/e2e/screenshots/*.png
+          if-no-files-found: ignore

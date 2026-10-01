@@ -1,0 +1,57 @@
+{
+  "name": "Sandbox Agent — fix tests",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "1b7a3c1e-0001-4000-8000-000000000001",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AGENT_BASE_URL || 'http://localhost:8000' }}/runs?wait=true",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Demo-Key", "value": "={{ $env.AGENT_DEMO_KEY || '' }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ task: 'Fix the parser so all tests pass', max_turns: 15, max_cost_usd: 0.25 }) }}",
+        "options": { "timeout": 600000 }
+      },
+      "id": "1b7a3c1e-0002-4000-8000-000000000002",
+      "name": "Run coding agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 0]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "a1", "name": "status", "value": "={{ $json.status }}", "type": "string" },
+            { "id": "a2", "name": "tests", "value": "={{ $json.tests_passed }}/{{ $json.tests_passed + $json.tests_failed }}", "type": "string" },
+            { "id": "a3", "name": "cost", "value": "={{ $json.cost }}", "type": "number" },
+            { "id": "a4", "name": "summary", "value": "={{ $json.summary }}", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1b7a3c1e-0003-4000-8000-000000000003",
+      "name": "Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [520, 0]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": { "main": [[{ "node": "Run coding agent", "type": "main", "index": 0 }]] },
+    "Run coding agent": { "main": [[{ "node": "Result", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}
