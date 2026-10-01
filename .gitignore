@@ -1,0 +1,9 @@
+.env
+data/spend.json
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+tests/e2e/screenshots/*.png
+!tests/e2e/screenshots/.gitkeep
+.playwright/

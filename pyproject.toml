@@ -1,0 +1,30 @@
+[project]
+name = "agent-loop-demo"
+version = "0.1.0"
+description = "Cloud coding agent that runs as a workflow node"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "sse-starlette>=2.1",
+    "openai>=1.50",
+    "e2b>=1.0",
+    "pyyaml>=6.0",
+    "httpx>=0.27",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "playwright>=1.47",
+    "pytest-playwright>=0.5",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests", "seed_repo/tests"]
+markers = ["e2b: requires E2B credentials"]
+
+[tool.uv]
+package = false

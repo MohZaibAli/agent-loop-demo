@@ -1,0 +1,56 @@
+{
+  "name": "scripted_isolation_run",
+  "description": "Two runs that prove each sandbox has an independent filesystem.",
+  "marker": "ISOLATION_MARKER_a7c3f1.txt",
+  "run_a": {
+    "turns": [
+      {
+        "text": "Writing a marker file into this workspace.",
+        "tool_calls": [
+          {
+            "id": "call_1",
+            "name": "write_file",
+            "arguments": {
+              "path": "ISOLATION_MARKER_a7c3f1.txt",
+              "content": "written by run A\n"
+            }
+          }
+        ]
+      },
+      {
+        "text": "Marker written to ISOLATION_MARKER_a7c3f1.txt in run A's workspace."
+      }
+    ]
+  },
+  "run_b": {
+    "turns": [
+      {
+        "text": "Listing the workspace to check for any marker left by another run.",
+        "tool_calls": [
+          {
+            "id": "call_1",
+            "name": "bash",
+            "arguments": {
+              "command": "ls -a"
+            }
+          }
+        ]
+      },
+      {
+        "text": "Attempting to read the marker directly.",
+        "tool_calls": [
+          {
+            "id": "call_1",
+            "name": "read_file",
+            "arguments": {
+              "path": "ISOLATION_MARKER_a7c3f1.txt"
+            }
+          }
+        ]
+      },
+      {
+        "text": "The marker file is absent in this workspace: run B cannot see files written by run A. Each run has an independent filesystem."
+      }
+    ]
+  }
+}

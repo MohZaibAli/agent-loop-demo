@@ -1,0 +1,86 @@
+{
+  "name": "scripted_fix_run",
+  "description": "Deterministic replay of a coding agent fixing two parser bugs.",
+  "turns": [
+    {
+      "text": "Running the test suite first to see what fails.",
+      "tool_calls": [
+        {
+          "id": "call_1",
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q"
+          }
+        }
+      ]
+    },
+    {
+      "text": "Two failures: HK$ is parsed as USD and the k suffix is ignored. Locating the currency parsing.",
+      "tool_calls": [
+        {
+          "id": "call_1",
+          "name": "search",
+          "arguments": {
+            "pattern": "CURRENCY_RE|SYMBOLS",
+            "path": "listing_parser"
+          }
+        }
+      ]
+    },
+    {
+      "text": "Reading the parser to see the regex and the amount handling.",
+      "tool_calls": [
+        {
+          "id": "call_1",
+          "name": "read_file",
+          "arguments": {
+            "path": "listing_parser/parser.py"
+          }
+        }
+      ]
+    },
+    {
+      "text": "Bug 1: the `$` alternative matches before `HK` can be read, so HK$ falls through to USD. Adding an HK$ alternative ahead of `$` and mapping it to HKD.",
+      "tool_calls": [
+        {
+          "id": "call_1",
+          "name": "edit_file",
+          "arguments": {
+            "path": "listing_parser/parser.py",
+            "old_str": "    r\"(?P<cur>\\$|€|£|HKD|USD|EUR|GBP|SGD|CHF|JPY)\\s*\"\n    r\"(?P<amt>\\d[\\d,]*(?:\\.\\d+)?)\\s*(?P<k>k)?\",\n    re.IGNORECASE,\n)\n\nSYMBOLS = {\"$\": \"USD\", \"€\": \"EUR\", \"£\": \"GBP\"}",
+            "new_str": "    r\"(?P<cur>HK\\$|\\$|€|£|HKD|USD|EUR|GBP|SGD|CHF|JPY)\\s*\"\n    r\"(?P<amt>\\d[\\d,]*(?:\\.\\d+)?)\\s*(?P<k>k)?\",\n    re.IGNORECASE,\n)\n\nSYMBOLS = {\"HK$\": \"HKD\", \"$\": \"USD\", \"€\": \"EUR\", \"£\": \"GBP\"}"
+          }
+        }
+      ]
+    },
+    {
+      "text": "Bug 2: the `k` group is captured but never applied. Multiplying the amount by 1000 when it is present.",
+      "tool_calls": [
+        {
+          "id": "call_1",
+          "name": "edit_file",
+          "arguments": {
+            "path": "listing_parser/parser.py",
+            "old_str": "    amount = float(match.group(\"amt\").replace(\",\", \"\"))\n",
+            "new_str": "    amount = float(match.group(\"amt\").replace(\",\", \"\"))\n    if match.group(\"k\"):\n        amount *= 1000\n"
+          }
+        }
+      ]
+    },
+    {
+      "text": "Re-running the tests to verify both fixes.",
+      "tool_calls": [
+        {
+          "id": "call_1",
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q"
+          }
+        }
+      ]
+    },
+    {
+      "text": "All 8 tests pass. Fixed two bugs in listing_parser/parser.py: HK$ amounts are now parsed as HKD (the HK$ token is matched before the bare $ symbol), and a trailing k suffix multiplies the amount by 1000 so `HKD 85k` becomes 85000."
+    }
+  ]
+}
