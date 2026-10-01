@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from dataclasses import dataclass, field
@@ -67,6 +68,10 @@ class ScriptedProvider:
         return cls(turns)
 
     async def complete(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> Completion:
+        # Optional pacing so a replayed demo reads like a model thinking (0 in tests).
+        delay = float(os.environ.get("MOCK_TURN_DELAY_S", "0") or 0)
+        if delay:
+            await asyncio.sleep(delay)
         if self._index >= len(self._turns):
             return Completion(text="Script exhausted; stopping.")
         turn = self._turns[self._index]

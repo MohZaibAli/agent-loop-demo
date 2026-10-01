@@ -241,6 +241,9 @@ section { padding: 72px 0 56px; border-bottom: 1px solid var(--hairline); }
 .ev[data-kind="assistant_text"]::before { border-color: var(--muted); }
 .ev[data-kind="model_routed"]::before { border-color: var(--accent); }
 @keyframes enter { to { opacity: 1; transform: none; } }
+.ev.active::before { background: var(--accent); border-color: var(--accent); animation: live 1.4s ease-in-out infinite; }
+.ev.active .res { color: var(--accent); }
+@keyframes live { 50% { opacity: 0.35; } }
 
 .ev-head {
   display: flex;
@@ -386,6 +389,7 @@ section { padding: 72px 0 56px; border-bottom: 1px solid var(--hairline); }
 /* ---------- reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {
   .ev { animation: none; opacity: 1; transform: none; }
+  .ev.active::before { animation: none; }
   .ev-detail { transition: none; }
   .progress.live { animation: none; transform: scaleX(1); }
   .btn, .workbench-input { transition: none; }

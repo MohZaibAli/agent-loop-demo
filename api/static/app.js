@@ -7,6 +7,8 @@
   const STAGGER_MS = 40;
 
   const state = {
+    follow: true,       // auto-scroll to the newest event while the user stays near it
+    programmatic: false,
     demoKey: "",
     provider: "mock",
     live: 0,          // number of in-flight runs
@@ -38,6 +40,30 @@
       if (p < 1) requestAnimationFrame(step);
     };
     requestAnimationFrame(step);
+  }
+
+  // ---------- follow the live step ----------
+  function nearBottom() {
+    return window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 240;
+  }
+  window.addEventListener("scroll", () => {
+    if (state.programmatic) return;
+    state.follow = nearBottom();
+  }, { passive: true });
+  function reveal(el) {
+    if (!state.follow || !el) return;
+    state.programmatic = true;
+    el.scrollIntoView({ block: "end", behavior: reduceMotion ? "auto" : "smooth" });
+    clearTimeout(reveal.t);
+    reveal.t = setTimeout(() => { state.programmatic = false; }, reduceMotion ? 50 : 500);
+  }
+  function collapseAll(list) {
+    list.querySelectorAll(".ev-detail.open").forEach((d) => d.classList.remove("open"));
+    list.querySelectorAll(".ev-toggle").forEach((t) => { t.setAttribute("aria-expanded", "false"); t.textContent = "expand"; });
+  }
+  function setActive(list, row) {
+    list.querySelectorAll(".ev.active").forEach((r) => r.classList.remove("active"));
+    if (row) row.classList.add("active");
   }
 
   // ---------- budget / status ----------
@@ -194,10 +220,13 @@
         return list.appendChild(makeRow("assistant_text", `AGENT ${ts}`,
           `<div class="ev-body text">${esc(ev.text)}</div>`, null, false, delay));
       case "tool_call": {
-        const row = makeRow("tool_call", `TOOL · ${toolLabel(ev.name)} <span class="res"></span> ${ts}`,
+        collapseAll(list);
+        const row = makeRow("tool_call", `TOOL · ${toolLabel(ev.name)} <span class="res">running…</span> ${ts}`,
           describeCall(ev), null, false, delay);
         pending.set(ev.id, row);
-        return list.appendChild(row);
+        list.appendChild(row);
+        setActive(list, row);
+        return row;
       }
       case "tool_result": {
         const row = pending.get(ev.id);
@@ -225,6 +254,7 @@
         return list.appendChild(makeRow("model_routed", `ROUTED ${ts}`,
           `<div class="ev-cmd">${esc(ev.model)}</div>`, null, false, delay));
       case "run_finished": {
+        setActive(list, null);
         const label = ev.status === "complete" ? "RUN COMPLETE" : `RUN ${esc(ev.status).toUpperCase()}`;
         return list.appendChild(makeRow("run_finished", `${label} <span class="t">${ev.turns} turns · ${fmtCost(ev.cost)}</span>`,
           null, null, false, delay));
@@ -266,6 +296,7 @@
     $("m-sandbox").textContent = "—";
     $("m-provider").textContent = "—";
     setStatus("queued");
+    state.follow = true;
     $("live").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
 
     let res;
@@ -292,7 +323,8 @@
         setCounter("m-tokens", ev.cumulative.total_tokens, (v) => fmtInt(Math.round(v)));
         setCounter("m-cost", ev.cumulative.cost, fmtCost);
       }
-      appendEvent($("timeline"), ev, pending, false);
+      const row = appendEvent($("timeline"), ev, pending, false);
+      reveal(row);
     }, (fin) => {
       setLive(-1);
       refreshBudget();
@@ -302,6 +334,7 @@
       setCounter("m-tokens", fin.tokens, (v) => fmtInt(Math.round(v)));
       setCounter("m-cost", fin.cost, fmtCost);
       showReport(fin);
+      reveal($("report"));
     });
   }
 

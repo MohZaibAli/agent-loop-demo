@@ -4,3 +4,4 @@ import os
 os.environ.setdefault("LLM_PROVIDER", "mock")
 os.environ.setdefault("SANDBOX_PROVIDER", "local")
 os.environ.pop("OPENROUTER_API_KEY", None)
+os.environ["MOCK_TURN_DELAY_S"] = "0"

@@ -114,3 +114,14 @@ def test_demo_key_reveal_on_double_r(page: Page, server: str):
     page.keyboard.type("rr")
     expect(page.locator("#demo-key")).to_be_visible()
     assert page.console_errors == []
+
+
+def test_live_step_focus_collapses_previous_output(page: Page, server: str):
+    run_single(page, server)
+    # After completion no row is still marked active, and only the latest tool outputs remain open.
+    assert page.locator("#timeline .ev.active").count() == 0
+    open_details = page.locator("#timeline .ev-detail.open")
+    assert open_details.count() <= 1
+    last_tool = page.locator('#timeline .ev[data-kind="tool_call"]').last
+    expect(last_tool.locator(".res")).to_contain_text("8 passed")
+    assert page.console_errors == []
