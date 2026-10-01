@@ -54,7 +54,10 @@
     <header class="overlay-head">
       <p class="label">02 — LIVE RUN</p>
       <p id="live-task" class="overlay-task mono"></p>
-      <button type="button" class="btn btn-close" data-close="live">Close ✕</button>
+      <div class="overlay-tools">
+        <button type="button" id="notes-toggle" class="toggle" aria-pressed="true" title="Show what each stage used under the hood">NOTES</button>
+        <button type="button" class="btn btn-close" data-close="live">Close ✕</button>
+      </div>
     </header>
     <div class="live-grid">
       <div class="trace">
@@ -73,10 +76,12 @@
           <div><dd id="m-turns" class="num">00</dd><dt>TURNS</dt></div>
           <div><dd id="m-tokens" class="num">0</dd><dt>TOKENS</dt></div>
           <div><dd id="m-cost" class="num cost">$0.000</dd><dt>COST</dt></div>
+          <div><dd id="m-cached" class="num">0</dd><dt>CACHED</dt></div>
         </dl>
         <hr class="rule">
         <dl class="facts">
           <dt>SANDBOX</dt><dd id="m-sandbox">—</dd>
+          <dt>ROUTER</dt><dd id="m-router">—</dd>
           <dt>MODEL</dt><dd id="m-model">—</dd>
           <dt>PROVIDER</dt><dd id="m-provider">—</dd>
           <dt>RUN</dt><dd id="m-run">—</dd>
@@ -90,7 +95,9 @@
     <header class="overlay-head">
       <p class="label">03 — PARALLEL RUNS</p>
       <p class="overlay-task">Three agents · three sandboxes · one task</p>
-      <button type="button" class="btn btn-close" data-close="parallel">Close ✕</button>
+      <div class="overlay-tools">
+        <button type="button" class="btn btn-close" data-close="parallel">Close ✕</button>
+      </div>
     </header>
     <div id="lanes" class="lanes"></div>
   </section>

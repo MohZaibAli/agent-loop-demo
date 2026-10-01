@@ -176,3 +176,18 @@ def test_mode_toggle_hidden_without_live_key(page: Page, server: str):
     page.goto(server)
     expect(page.locator("#mode")).to_be_hidden()
     expect(page.locator("#provider-label")).to_have_text("MOCK")
+
+
+def test_stage_notes_present_and_toggle(page: Page, server: str):
+    run_single(page, server)
+    notes = page.locator("#timeline .ev-note")
+    assert notes.count() >= 6
+    expect(notes.first).to_contain_text("Sandbox")
+    expect(page.locator('#timeline .ev[data-kind="tool_call"] .ev-note').first).to_contain_text("bash")
+    expect(page.locator("#m-router")).to_contain_text("scripted")
+    page.click("#notes-toggle")
+    expect(page.locator("#notes-toggle")).to_have_attribute("aria-pressed", "false")
+    expect(notes.first).to_be_hidden()
+    page.click("#notes-toggle")
+    expect(notes.first).to_be_visible()
+    assert page.console_errors == []

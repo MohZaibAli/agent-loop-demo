@@ -6,15 +6,19 @@
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const STAGGER_MS = 40;
 
-  let storedKey = "", storedLive = false;
+  let storedKey = "", storedLive = false, storedNotes = true;
   try {
     storedKey = localStorage.getItem("demoKey") || "";
     storedLive = localStorage.getItem("liveMode") === "1";
+    storedNotes = localStorage.getItem("stackNotes") !== "0";
   } catch (_) { /* private mode */ }
   const state = {
     scenario: "listing_parser",
     scenarios: [],
     realAvailable: false,
+    sandboxProvider: "",
+    router: "",
+    notes: storedNotes,
     follow: true,       // auto-scroll to the newest event while the user stays near it
     programmatic: false,
     demoKey: storedKey,
@@ -89,6 +93,8 @@
     try {
       const s = await (await fetch("/status")).json();
       state.lastModel = s.model;
+      state.sandboxProvider = s.sandbox_provider;
+      state.router = s.router || "";
       state.realAvailable = !!s.real_available;
       $("foot-meta").textContent = `sandbox: ${s.sandbox_provider} · model: ${s.model}`;
       syncMode();
@@ -296,6 +302,62 @@
     if (!state.live) openOverlay(null);
   });
 
+  // ---------- stage notes: what each step used, from facts the events already carry ----------
+  function syncNotes() {
+    document.body.classList.toggle("notes-off", !state.notes);
+    $("notes-toggle").setAttribute("aria-pressed", String(state.notes));
+  }
+  $("notes-toggle").addEventListener("click", () => {
+    state.notes = !state.notes;
+    try { localStorage.setItem("stackNotes", state.notes ? "1" : "0"); } catch (_) { /* ignore */ }
+    syncNotes();
+  });
+  syncNotes();
+
+  const TOOL_NOTES = {
+    bash: "<b>bash</b> runs in the sandbox shell with a 60s timeout; output over 10k chars is truncated head+tail.",
+    search: "<b>search</b> uses ripgrep inside the sandbox (grep -rn fallback); nothing is installed at runtime.",
+    read_file: "<b>read_file</b> returns numbered lines; paths are resolved and confined to /home/user/workspace.",
+    edit_file: "<b>edit_file</b> replaces exactly one match and refuses 0 or 2+; the unified diff you see is the real change.",
+    write_file: "<b>write_file</b> creates or replaces a file inside the workspace only.",
+  };
+  function stageNote(ev) {
+    const e2b = state.sandboxProvider === "e2b";
+    switch (ev.type) {
+      case "run_started": {
+        const sb = e2b
+          ? `<b>E2B</b> microVM from template <b>agent-loop-py312</b> (Python 3.12, pytest, ripgrep), internet off, seeded with the repo`
+          : `<b>LocalSandbox</b> temp directory (test mode)`;
+        const route = ev.provider === "mock"
+          ? `Provider: <b>scripted replay</b>, no model call, $0.`
+          : ev.router
+            ? `First turn goes to <b>OpenRouter Jev Router</b> (<span class="hl">${esc(ev.router)}</span>), which picks a model for this prompt.`
+            : `Model: <b>${esc(ev.model)}</b> via OpenRouter.`;
+        return `Sandbox: ${sb}. ${route}`;
+      }
+      case "model_routed":
+        return `<b>Jev</b> chose <span class="hl">${esc(ev.model)}</span> for this task, balancing quality, speed and cost. The pick is pinned for the rest of the run so the cached system prompt and tools keep hitting.`;
+      case "tool_call":
+        return TOOL_NOTES[ev.name] || "";
+      case "tool_result": {
+        if (ev.name === "bash" && /pytest/.test(ev.arguments?.command || "")) return "";
+        return "";
+      }
+      case "run_finished":
+        return `Sandbox killed in <b>finally</b>; usage priced from OpenRouter's accounted cost and written to the spend ledger (${fmtCost(ev.cost)}).`;
+      default:
+        return "";
+    }
+  }
+  function usageNote(ev) {
+    if (!ev.cached_tokens) return "";
+    return `Prompt cache hit: <b>${fmtInt(ev.cached_tokens)}</b> of ${fmtInt(ev.prompt_tokens)} prompt tokens read from cache at 10% of input price.`;
+  }
+  function attachNote(row, html) {
+    if (!row || !html) return;
+    row.insertAdjacentHTML("beforeend", `<p class="ev-note">${html}</p>`);
+  }
+
   // ---------- pending indicator ("what is it doing right now") ----------
   function setPending(list, text) {
     let row = list.querySelector(".ev.pending");
@@ -350,6 +412,8 @@
     counterCache.clear();
     ["m-turns", "m-tokens"].forEach((id) => ($(id).textContent = id === "m-turns" ? "00" : "0"));
     $("m-cost").textContent = "$0.000";
+    $("m-cached").textContent = "0";
+    $("m-router").textContent = "—";
     $("m-sandbox").textContent = "—";
     $("m-provider").textContent = "—";
     setStatus("queued");
@@ -387,19 +451,23 @@
     subscribe(run_id, (ev) => {
       if (ev.type === "run_started") {
         $("m-sandbox").textContent = ev.sandbox_id;
-        $("m-model").textContent = ev.router ? `${ev.router} → …` : ev.model;
+        $("m-router").textContent = ev.provider === "mock" ? "— (scripted)" : (ev.router || "— (fixed)");
+        $("m-model").textContent = ev.router && ev.provider !== "mock" ? "routing…" : ev.model;
         setStatus("running");
       }
       if (ev.type === "model_routed") $("m-model").textContent = ev.model;
       if (ev.type === "usage") {
         setCounter("m-turns", ev.turn, (v) => pad2(Math.round(v)));
         setCounter("m-tokens", ev.cumulative.total_tokens, (v) => fmtInt(Math.round(v)));
+        setCounter("m-cached", ev.cumulative.cached_tokens, (v) => fmtInt(Math.round(v)));
         setCounter("m-cost", ev.cumulative.cost, fmtCost);
       }
       const list = $("timeline");
       const next = pendingTextAfter(ev);
       if (next !== undefined) setPending(list, null);
-      appendEvent(list, ev, pending, false);
+      const row = appendEvent(list, ev, pending, false);
+      if (ev.type === "usage") { const last = list.querySelector(".ev:not(.pending):last-of-type"); if (ev.turn === 1) attachNote(last, usageNote(ev)); }
+      else if (ev.type !== "tool_result") attachNote(row, stageNote(ev));
       if (next) setPending(list, next);
       else if (ev.type === "assistant_text" && !list.querySelector(".ev.active")) setPending(list, "Deciding the next step…");
       reveal();
