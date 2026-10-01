@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sandbox Agents</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ctext x=%274%27 y=%2728%27 font-size=%2732%27 font-family=%27Georgia%27 fill=%27%23FF4F1A%27%3E*%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600&family=Instrument+Serif:ital@1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="/">Sandbox Agents<span class="asterisk">*</span></a>
+  <div class="topbar-right">
+    <input id="demo-key" class="demo-key" type="password" autocomplete="off" spellcheck="false"
+           placeholder="demo key" aria-label="Demo key" hidden>
+    <span id="provider-label" class="provider-label" data-provider="mock">MOCK</span>
+    <span id="budget" class="budget"><span id="budget-remaining">$4.000</span> remaining</span>
+  </div>
+  <div id="progress" class="progress" aria-hidden="true"></div>
+</header>
+
+<main>
+  <section class="hero">
+    <p class="label">01 — CLOUD CODING AGENTS</p>
+    <h1>Agents that write, run and <em>fix</em> code.</h1>
+    <p class="lede">Each run gets its own sandbox, a shell, a file system and a test runner. The agent inspects
+      the repository, edits it, and proves the fix by running the tests — as a node in your workflow.</p>
+
+    <form id="task-form" class="workbench" autocomplete="off">
+      <label class="workbench-label" for="task">TASK</label>
+      <div class="workbench-input">
+        <span class="prompt" aria-hidden="true">›</span>
+        <textarea id="task" name="task" rows="1" spellcheck="false">Fix the parser so all tests pass</textarea>
+      </div>
+      <div class="workbench-actions">
+        <button id="run" type="submit" class="btn btn-primary">Run agent →</button>
+        <button id="run-parallel" type="button" class="btn btn-secondary">Run 3 in parallel</button>
+        <span class="workbench-meta">seed: <code>listing_parser</code> · 2 failing tests · cap <code>$0.25</code> / run</span>
+      </div>
+    </form>
+  </section>
+
+  <section id="live" class="live" hidden>
+    <p class="label">02 — LIVE RUN</p>
+    <div class="live-grid">
+      <div class="trace">
+        <ol id="timeline" class="timeline" aria-live="polite"></ol>
+        <section id="report" class="report" hidden>
+          <p class="label">RESULT</p>
+          <p class="report-score"><span id="report-tests" class="score">—</span><span class="score-label">TESTS PASSED</span></p>
+          <p id="report-summary" class="report-summary"></p>
+          <div id="report-diff" class="diff-wrap"></div>
+        </section>
+      </div>
+
+      <aside id="instrument" class="instrument">
+        <p class="label">RUN</p>
+        <dl class="readouts">
+          <div><dd id="m-turns" class="num">00</dd><dt>TURNS</dt></div>
+          <div><dd id="m-tokens" class="num">0</dd><dt>TOKENS</dt></div>
+          <div><dd id="m-cost" class="num cost">$0.000</dd><dt>COST</dt></div>
+        </dl>
+        <hr class="rule">
+        <dl class="facts">
+          <dt>SANDBOX</dt><dd id="m-sandbox">—</dd>
+          <dt>MODEL</dt><dd id="m-model">—</dd>
+          <dt>PROVIDER</dt><dd id="m-provider">—</dd>
+          <dt>RUN</dt><dd id="m-run">—</dd>
+          <dt>STATUS</dt><dd id="m-status" class="status" data-state="idle"><span class="dot"></span><span id="m-status-text">IDLE</span></dd>
+        </dl>
+      </aside>
+    </div>
+  </section>
+
+  <section id="parallel" class="parallel" hidden>
+    <p class="label">03 — PARALLEL RUNS</p>
+    <p class="lede small">Three agents, three sandboxes, one task. Each lane is an independent execution trace.</p>
+    <div id="lanes" class="lanes"></div>
+  </section>
+</main>
+
+<footer class="foot">
+  <span>Sandbox Agents<span class="asterisk">*</span> — a coding agent as a workflow node.</span>
+  <span class="mono" id="foot-meta">sandbox: — · model: —</span>
+</footer>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
