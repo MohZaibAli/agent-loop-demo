@@ -316,7 +316,7 @@ body.has-overlay { overflow: hidden; }
 .status[data-state="running"] { color: var(--accent); }
 .status[data-state="complete"] .dot { background: var(--ink); }
 .status[data-state="error"] .dot, .status[data-state="max_turns"] .dot, .status[data-state="max_cost"] .dot,
-.status[data-state="rejected"] .dot, .status[data-state="timeout"] .dot { background: var(--diff-remove); }
+.status[data-state="rejected"] .dot, .status[data-state="timeout"] .dot, .status[data-state="interrupted"] .dot { background: var(--diff-remove); }
 
 /* ---------- timeline ---------- */
 .timeline {

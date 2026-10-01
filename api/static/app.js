@@ -386,15 +386,27 @@
   // ---------- SSE ----------
   function subscribe(runId, onEvent, onDone) {
     const es = new EventSource(`/runs/${runId}/events`);
+    let lastSeq = -1;
+    let finished = false;
     const handler = (e) => {
       const ev = JSON.parse(e.data);
+      if (ev.seq <= lastSeq) return; // replayed after a reconnect
+      lastSeq = ev.seq;
       onEvent(ev);
-      if (ev.type === "run_finished") { es.close(); onDone(ev); }
+      if (ev.type === "run_finished") { finished = true; es.close(); onDone(ev); }
     };
     for (const t of ["run_started", "assistant_text", "tool_call", "tool_result", "usage", "model_routed", "run_finished", "error"]) {
       es.addEventListener(t, handler);
     }
-    es.onerror = () => { es.close(); onDone(null); };
+    // On a dropped connection EventSource reconnects by itself and the server replays
+    // history (deduped above). Only give up when the run no longer exists: a restart.
+    es.onerror = async () => {
+      if (finished) return;
+      try {
+        const r = await fetch(`/runs/${runId}`);
+        if (r.status === 404) { es.close(); onDone({ interrupted: true }); }
+      } catch (_) { /* server unreachable: keep EventSource retrying */ }
+    };
     return es;
   }
 
@@ -422,7 +434,7 @@
 
     let res;
     try {
-      res = await fetch("/runs", { method: "POST", headers: headers(), body: JSON.stringify({ task, scenario: state.scenario }) });
+      res = await fetch("/runs", { method: "POST", headers: headers(), body: JSON.stringify(runBody({ task })) });
     } catch (err) { setStatus("error"); return; }
     if (res.status === 403 && currentNeedsLive()) {
       // Wrong or stale password: ask again and retry once accepted.
@@ -475,7 +487,14 @@
       setPending($("timeline"), null);
       setLive(-1);
       refreshBudget();
-      if (!fin) { setStatus("error"); return; }
+      if (!fin || fin.interrupted) {
+        setStatus("interrupted");
+        $("m-status-text").textContent = "INTERRUPTED · SERVER RESTARTED";
+        $("timeline").appendChild(makeRow("error", `<span class="fail">INTERRUPTED</span>`,
+          `<div class="ev-body">The service restarted during this run (a deploy or crash). The sandbox was discarded. Run it again.</div>`, null, false, 0));
+        reveal();
+        return;
+      }
       setStatus(fin.status);
       setCounter("m-turns", fin.turns, (v) => pad2(Math.round(v)));
       setCounter("m-tokens", fin.tokens, (v) => fmtInt(Math.round(v)));
@@ -500,7 +519,7 @@
     const lanes = $("lanes");
     lanes.innerHTML = "";
 
-    const res = await fetch("/runs/batch", { method: "POST", headers: headers(), body: JSON.stringify({ task, count: 3, scenario: state.scenario }) });
+    const res = await fetch("/runs/batch", { method: "POST", headers: headers(), body: JSON.stringify(runBody({ task, count: 3 })) });
     if (res.status === 403 && currentNeedsLive()) {
       openOverlay(null);
       forgetKey();
@@ -556,7 +575,8 @@
         pin();
         setLive(-1);
         refreshBudget();
-        const s = fin ? fin.status : "error";
+        const s = !fin || fin.interrupted ? "interrupted" : fin.status;
+        if (fin && fin.interrupted) fin = null;
         status.dataset.state = s;
         status.querySelector(".st").textContent = s.replace("_", " ").toUpperCase();
         if (fin) {
@@ -630,6 +650,10 @@
     const sc = state.scenarios.find((x) => x.id === state.scenario);
     return !!sc && !sc.mock;
   }
+  // Jev may route to a premium model; give the live demos headroom under the global ceiling.
+  const LIVE_RUN_CAP = 0.75;
+  const runBody = (extra) => ({ task: extra.task, scenario: state.scenario,
+    ...(liveReady() ? { max_cost_usd: LIVE_RUN_CAP } : {}), ...extra });
 
   // ---------- demo password dialog ----------
   let keyResolve = null;
