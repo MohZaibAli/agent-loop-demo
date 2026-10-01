@@ -87,6 +87,9 @@ installed inside a sandbox at runtime. Build it once:
 E2B_API_KEY=... make build-template     # scripts/build_e2b_template.py, alias agent-loop-py312
 ```
 
+The deployed app also checks for the template at startup (when `SANDBOX_PROVIDER=e2b` and `E2B_API_KEY` is
+set) and builds it once if the alias is missing. That is the only place packages are ever installed.
+
 Each run creates one `AsyncSandbox` from that template with a TTL, uploads `seed_repo/` to
 `/home/user/workspace`, and kills the sandbox in `finally`. A reaper also kills sandboxes past their TTL or
 idle timeout. Sandboxes are created with `allow_internet_access=False`.

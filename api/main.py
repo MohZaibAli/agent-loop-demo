@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -35,11 +36,26 @@ class BatchRequest(RunRequest):
     count: int = Field(default=3, ge=1, le=3)
 
 
+log = logging.getLogger("uvicorn.error")
+
+
+async def _ensure_e2b_template() -> None:
+    """One-time template build on first boot with an E2B key; never installs anything per run."""
+    try:
+        from scripts.build_e2b_template import ensure_template
+
+        await ensure_template(log.info)
+    except Exception as exc:  # noqa: BLE001 - startup must not die on a template problem
+        log.error("E2B template check failed: %s", exc)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.registry = Registry(ttl_s=DEFAULTS["sandbox_ttl_s"], idle_s=DEFAULTS["sandbox_idle_s"])
     app.state.budget = Budget()
     app.state.registry.start_reaper()
+    if sandbox_provider() == "e2b" and os.environ.get("E2B_API_KEY"):
+        app.state.template_task = asyncio.create_task(_ensure_e2b_template())
     yield
     await app.state.registry.shutdown()
 

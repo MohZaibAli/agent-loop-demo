@@ -11,6 +11,7 @@ COPY agent ./agent
 COPY api ./api
 COPY seed_repo ./seed_repo
 COPY tests/fixtures ./tests/fixtures
+COPY scripts ./scripts
 COPY config.yaml ./
 
 # Runtime configuration comes from the environment (see .env.example).

@@ -21,10 +21,19 @@ def template() -> object:
     )
 
 
-async def main() -> None:
+async def ensure_template(log=print) -> bool:
+    """Build the template if its alias does not exist yet. Returns True when it was built."""
+    if await AsyncTemplate.alias_exists(E2B_TEMPLATE):
+        log(f"template {E2B_TEMPLATE} already exists")
+        return False
     info = await AsyncTemplate.build(template(), E2B_TEMPLATE, cpu_count=1, memory_mb=512,
-                                     on_build_logs=lambda e: print(e.message))
-    print(f"built template {E2B_TEMPLATE}: {info}")
+                                     on_build_logs=lambda e: log(e.message))
+    log(f"built template {E2B_TEMPLATE}: {info}")
+    return True
+
+
+async def main() -> None:
+    await ensure_template()
 
 
 if __name__ == "__main__":
