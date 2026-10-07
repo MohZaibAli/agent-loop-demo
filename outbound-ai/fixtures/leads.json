@@ -1,0 +1,58 @@
+{
+  "columns": [
+    "User Phone Number",
+    "First Name",
+    "Job Title",
+    "Current Job Description",
+    "New Job Opportunity",
+    "Date & Time",
+    "Call Made"
+  ],
+  "rows": [
+    {
+      "User Phone Number": "+15550100001",
+      "First Name": "Amelia",
+      "Job Title": "Registered Nurse",
+      "Current Job Description": "Med-surg RN at a 300-bed community hospital, rotating 12-hour shifts.",
+      "New Job Opportunity": "Travel RN contract in Austin, TX: 13 weeks, $2,850/week, housing stipend included.",
+      "Date & Time": "",
+      "Call Made": ""
+    },
+    {
+      "User Phone Number": "+15550100002",
+      "First Name": "Marcus",
+      "Job Title": "ICU Nurse",
+      "Current Job Description": "Night-shift ICU nurse, 4 years experience, CCRN certified.",
+      "New Job Opportunity": "Day-shift ICU lead at a Level I trauma center in Denver, $12k sign-on bonus.",
+      "Date & Time": "",
+      "Call Made": "false"
+    },
+    {
+      "User Phone Number": "+15550100003",
+      "First Name": "Priya",
+      "Job Title": "Nurse Practitioner",
+      "Current Job Description": "Family NP in a rural primary care clinic.",
+      "New Job Opportunity": "Telehealth NP role, fully remote, flexible 4-day week.",
+      "Date & Time": "2026-09-30T14:05:00Z",
+      "Call Made": "TRUE"
+    },
+    {
+      "User Phone Number": "+15550100004",
+      "First Name": "Daniel",
+      "Job Title": "ER Nurse",
+      "Current Job Description": "Emergency department charge nurse, high-volume urban ER.",
+      "New Job Opportunity": "ER educator position, Monday to Friday, no weekends or holidays.",
+      "Date & Time": "",
+      "Call Made": "FALSE"
+    },
+    {
+      "User Phone Number": "+15550100005",
+      "First Name": "Sofia",
+      "Job Title": "Pediatric Nurse",
+      "Current Job Description": "Pediatric oncology nurse at a children's hospital.",
+      "New Job Opportunity": "Pediatric home-health case manager, local, salaried with full benefits.",
+      "Date & Time": "2026-10-01T09:30:00Z",
+      "Call Made": "true"
+    }
+  ]
+}

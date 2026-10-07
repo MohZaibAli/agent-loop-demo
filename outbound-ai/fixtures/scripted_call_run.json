@@ -1,0 +1,14 @@
+{
+  "description": "Scripted mock responses replayed by the mock providers so demos never touch Twilio or Retell.",
+  "sms": {
+    "status": "queued",
+    "sid_prefix": "SMmock",
+    "price_usd": 0.0079
+  },
+  "call": {
+    "call_status": "registered",
+    "call_id_prefix": "call_mock",
+    "estimated_minutes": 3,
+    "transcript_preview": "Hi {{first_name}}, this is Sarah from Six Flow Nursing. I'm calling about the {{new_job_opportunity}} we texted you about..."
+  }
+}

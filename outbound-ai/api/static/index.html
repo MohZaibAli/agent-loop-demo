@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voice Flow Agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=Instrument+Serif:ital@1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">Voice Flow <em>Agent</em></div>
+  <div class="meta"><span id="mode" class="pill">MOCK</span><span id="sheet" class="mono"></span></div>
+</header>
+<main>
+  <section class="trace">
+    <div class="trace-head">Pipeline <span class="muted">Phase 1: sheet sync &amp; filtering</span></div>
+    <ol class="steps">
+      <li class="step done">FETCH_SHEETS</li>
+      <li class="step done">FILTER_LEADS</li>
+      <li class="step">SEND_SMS</li>
+      <li class="step">WAIT</li>
+      <li class="step">RETELL_CALL</li>
+      <li class="step">UPDATE_SHEET</li>
+    </ol>
+  </section>
+  <section>
+    <div class="trace-head">Leads <span id="count" class="muted"></span>
+      <label class="muted"><input type="checkbox" id="pending" checked> pending only</label></div>
+    <table id="leads"><thead><tr><th>row</th><th>phone</th><th>first name</th><th>job title</th><th>new opportunity</th><th>call made</th><th>date &amp; time</th></tr></thead><tbody></tbody></table>
+  </section>
+  <section id="keybox" class="hidden">
+    <label class="muted">X-Demo-Key <input id="demokey" type="password" class="mono"></label>
+  </section>
+</main>
+<script src="/static/app.js"></script>
+</body>
+</html>

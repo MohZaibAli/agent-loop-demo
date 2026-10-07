@@ -1,0 +1,24 @@
+# Workflow defaults and unit costs (USD) used by the budget guard.
+defaults:
+  wait_seconds: 600
+  wait_seconds_mock: 5
+  max_leads_per_run: 25
+budget:
+  global_ceiling_usd: 10.00
+costs:
+  sms_usd: 0.0079            # Twilio US outbound SMS
+  call_per_minute_usd: 0.14  # Retell voice (incl. telephony) rough estimate
+  call_estimate_minutes: 3
+sms_template: >-
+  Hi {{first_name}}, I'm Sarah, an AI recruitment consultant from Six Flow Nursing.
+  I'll be giving you a call in about 10 minutes to discuss a new opportunity with you.
+  Looking forward to our chat.
+sheet:
+  columns:
+    - User Phone Number
+    - First Name
+    - Job Title
+    - Current Job Description
+    - New Job Opportunity
+    - Date & Time
+    - Call Made

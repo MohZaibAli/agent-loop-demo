@@ -4,15 +4,19 @@ on:
   push:
   pull_request:
 
-# No LLM or E2B credentials are ever provided to CI. All tests use the
-# scripted mock provider and the local sandbox.
+# No LLM, E2B, Twilio or Retell credentials are ever provided to CI.
+# All tests use mock providers.
 env:
   LLM_PROVIDER: mock
   SANDBOX_PROVIDER: local
+  SERVICE_PROVIDER: mock
 
 jobs:
-  test:
+  sandbox-agents:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sandbox-agents
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -24,6 +28,19 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: screenshots
-          path: tests/e2e/screenshots/*.png
+          name: sandbox-agents-screenshots
+          path: sandbox-agents/tests/e2e/screenshots/*.png
           if-no-files-found: ignore
+
+  outbound-ai:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: outbound-ai
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: uv sync --group dev
+      - run: make test
