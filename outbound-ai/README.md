@@ -2,7 +2,7 @@
 
 Outbound voice calling and pre-call SMS workflow: Google Sheets → Twilio SMS → wait → Retell AI call →
 sheet update. Standalone Python (FastAPI + static HTML/CSS/JS), no n8n. Live at
-https://outbound-ai-production-a461.up.railway.app
+https://outbound-ai.up.railway.app
 
 ```
 FETCH_SHEETS → FILTER_LEADS → SEND_SMS → WAIT → RETELL_CALL → UPDATE_SHEET
