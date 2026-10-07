@@ -93,3 +93,9 @@ def test_scripted_run_fixture_and_render():
     assert data["sms"]["status"] == "queued"
     assert render(data["call"]["transcript_preview"], {"first_name": "Amelia", "new_job_opportunity": "X"}).startswith("Hi Amelia")
     assert render("Hi {{first_name}}", {"first_name": "Bo"}) == "Hi Bo"
+
+
+def test_add_lead_appends_pending_row(sheet):
+    lead = sheet.add_lead({"User Phone Number": "+15550100042", "First Name": "Zed"})
+    assert lead.row == 7 and lead.call_made is False and lead.job_title == ""
+    assert len(filter_pending(sheet.read_leads())) == 4

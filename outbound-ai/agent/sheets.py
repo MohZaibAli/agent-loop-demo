@@ -115,6 +115,7 @@ class Sheet(Protocol):
 
     def read_leads(self) -> list[Lead]: ...
     def mark_called(self, row: int, when: str | None = None) -> Lead: ...
+    def add_lead(self, record: dict) -> Lead: ...
 
 
 class SchemaError(ValueError):
@@ -151,6 +152,11 @@ class FixtureSheet:
         self.records[idx][DATE_TIME] = when or now_iso()
         return Lead.from_record(row, self.records[idx])
 
+    def add_lead(self, record: dict) -> Lead:
+        row = {c: str(record.get(c, "") or "") for c in COLUMNS}
+        self.records.append(row)
+        return Lead.from_record(len(self.records) + 1, row)
+
     def reset(self, path: str | Path | None = None) -> None:
         self.records = FixtureSheet.load(path).records
 
@@ -177,6 +183,12 @@ class GoogleSheet:
     def read_leads(self) -> list[Lead]:
         records = self.ws.get_all_records(expected_headers=COLUMNS)
         return [Lead.from_record(i + 2, r) for i, r in enumerate(records)]
+
+    def add_lead(self, record: dict) -> Lead:
+        values = [str(record.get(c, "") or "") for c in self.header]
+        self.ws.append_row(values, value_input_option="RAW")
+        row = len(self.ws.get_all_values())
+        return Lead.from_record(row, dict(zip(self.header, values)))
 
     def mark_called(self, row: int, when: str | None = None) -> Lead:
         when = when or now_iso()

@@ -43,4 +43,11 @@ jobs:
         with:
           python-version: "3.12"
       - run: uv sync --group dev
+      - run: uv run playwright install --with-deps chromium
       - run: make test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: outbound-ai-screenshots
+          path: outbound-ai/tests/e2e/screenshots/*.png
+          if-no-files-found: ignore

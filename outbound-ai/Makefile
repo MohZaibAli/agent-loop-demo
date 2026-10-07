@@ -8,7 +8,7 @@ install:
 	uv sync --group dev
 
 # Everything runs against mock providers. Never sends a real SMS or places a real call.
-test: test-unit test-api
+test: test-unit test-api test-e2e
 
 test-unit:
 	uv run pytest tests/unit -q

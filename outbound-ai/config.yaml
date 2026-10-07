@@ -4,7 +4,7 @@ defaults:
   wait_seconds_mock: 5
   max_leads_per_run: 25
 budget:
-  global_ceiling_usd: 10.00
+  global_ceiling_usd: 4.00
 costs:
   sms_usd: 0.0079            # Twilio US outbound SMS
   call_per_minute_usd: 0.14  # Retell voice (incl. telephony) rough estimate

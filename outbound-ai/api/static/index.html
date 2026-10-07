@@ -9,30 +9,129 @@
 <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
-<header class="top">
-  <div class="brand">Voice Flow <em>Agent</em></div>
-  <div class="meta"><span id="mode" class="pill">MOCK</span><span id="sheet" class="mono"></span></div>
+
+<header class="top" id="top">
+  <div class="brand">Voice Flow <em>Agent</em><span class="ast">*</span></div>
+  <div class="badges mono">
+    <span class="badge" id="mode-badge" data-mode="MOCK">MOCK</span>
+    <span class="badge" id="sheet-badge">sheet=fixture</span>
+    <span class="badge" id="provider-badge">provider=mock</span>
+  </div>
+  <div class="right mono">
+    <span class="budget"><span id="budget-remaining">$4.000</span> remaining</span>
+    <span class="keyind" id="keyind" title="press r r">key ○</span>
+    <label class="keybox hidden" id="keybox">X-Demo-Key <input id="demokey" type="password" class="mono" autocomplete="off"></label>
+  </div>
 </header>
+
 <main>
-  <section class="trace">
-    <div class="trace-head">Pipeline <span class="muted">Phase 1: sheet sync &amp; filtering</span></div>
-    <ol class="steps">
-      <li class="step done">FETCH_SHEETS</li>
-      <li class="step done">FILTER_LEADS</li>
-      <li class="step">SEND_SMS</li>
-      <li class="step">WAIT</li>
-      <li class="step">RETELL_CALL</li>
-      <li class="step">UPDATE_SHEET</li>
-    </ol>
-  </section>
-  <section>
-    <div class="trace-head">Leads <span id="count" class="muted"></span>
-      <label class="muted"><input type="checkbox" id="pending" checked> pending only</label></div>
-    <table id="leads"><thead><tr><th>row</th><th>phone</th><th>first name</th><th>job title</th><th>new opportunity</th><th>call made</th><th>date &amp; time</th></tr></thead><tbody></tbody></table>
-  </section>
-  <section id="keybox" class="hidden">
-    <label class="muted">X-Demo-Key <input id="demokey" type="password" class="mono"></label>
-  </section>
+
+<!-- HERO: get a call -->
+<section class="hero" id="hero">
+  <div class="hero-copy">
+    <div class="kicker mono">00 — OUTBOUND VOICE AGENT</div>
+    <h1>Scalable AI <em>outbound</em> calling.</h1>
+    <p class="lede">Sarah reads the lead row, texts first, waits, then calls with the job context
+      injected as Retell dynamic variables. Every step is traced below.</p>
+    <div class="hero-actions">
+      <button class="btn primary" id="run">Run Pipeline →</button>
+      <button class="btn" id="run-batch">Run Batch (3 Parallel)</button>
+      <button class="btn ghost" id="reset">Reset sheet</button>
+    </div>
+  </div>
+
+  <div class="callbox" id="callbox" data-stage="1">
+    <div class="callbox-tabs mono">
+      <span class="tab active" data-tab="voice">VOICE</span>
+      <span class="tab" data-tab="sheet">SHEET</span>
+    </div>
+    <div class="stage" data-stage="1">
+      <h2>Get a call on your phone</h2>
+      <p class="muted">Leave your details. Sarah texts you, then calls about the opportunity.</p>
+      <label>Name<input id="f-name" placeholder="John" autocomplete="given-name"></label>
+      <label>Phone number<input id="f-phone" class="mono" placeholder="+1 555 010 0099" inputmode="tel"></label>
+      <label class="consent"><input type="checkbox" id="f-consent"> <span>I consent to receiving one SMS and one AI voice call at this number. Msg &amp; data rates may apply.</span></label>
+      <div class="stage-foot">
+        <button class="btn primary" id="get-call" disabled>Get a call</button>
+        <span class="progress"><i class="on"></i><i></i><i></i></span>
+      </div>
+      <div class="err mono hidden" id="f-err"></div>
+    </div>
+    <div class="stage hidden" data-stage="2">
+      <h2>Texting you first</h2>
+      <p class="muted">Row <b class="mono" id="s2-row">—</b> added to the sheet. SMS dispatched, now waiting before the call.</p>
+      <pre class="mono smsprev" id="s2-sms"></pre>
+      <div class="stage-foot">
+        <span class="status mono" id="s2-status">● SEND_SMS</span>
+        <span class="progress"><i class="on"></i><i class="on"></i><i></i></span>
+      </div>
+    </div>
+    <div class="stage hidden" data-stage="3">
+      <h2>Calling now</h2>
+      <p class="muted">Retell placed the call and the sheet row was marked done.</p>
+      <dl class="kv mono">
+        <dt>CALL_ID</dt><dd id="s3-call">—</dd>
+        <dt>CALL_STATUS</dt><dd id="s3-status">—</dd>
+        <dt>SHEET</dt><dd id="s3-sheet">—</dd>
+      </dl>
+      <div class="stage-foot">
+        <button class="btn" id="again">← Another</button>
+        <span class="progress"><i class="on"></i><i class="on"></i><i class="on"></i></span>
+      </div>
+    </div>
+    <div class="stage sheetview hidden" data-stage="sheet">
+      <h2>Lead sheet</h2>
+      <p class="muted"><span id="count"></span> <label class="mono"><input type="checkbox" id="pending" checked> pending only</label></p>
+      <table id="leads" class="mono"><thead><tr><th>row</th><th>phone</th><th>name</th><th>call made</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+</section>
+
+<!-- 01 PIPELINE -->
+<section class="sec">
+  <div class="sec-head mono">01 — WORKFLOW PIPELINE</div>
+  <ol class="pipeline mono" id="pipeline">
+    <li data-step="FETCH_SHEETS" data-state="">FETCH_SHEETS</li>
+    <li data-step="FILTER_LEADS" data-state="">FILTER_LEADS</li>
+    <li data-step="SEND_SMS" data-state="">SEND_SMS</li>
+    <li data-step="WAIT" data-state="">WAIT</li>
+    <li data-step="RETELL_CALL" data-state="">RETELL_CALL</li>
+    <li data-step="UPDATE_SHEET" data-state="">UPDATE_SHEET</li>
+  </ol>
+</section>
+
+<!-- 02 TRACE + INSTRUMENTATION -->
+<section class="sec workbench" id="workbench">
+  <div class="trace-col">
+    <div class="sec-head mono">02 — LIVE EXECUTION TRACE <span class="muted" id="trace-sub">○ IDLE</span></div>
+    <div class="lanes" id="lanes" data-count="1">
+      <div class="lane" data-lane="0">
+        <div class="lane-head mono"><span class="lane-id">—</span><span class="lane-status" data-state="idle">○ IDLE</span></div>
+        <ol class="timeline"></ol>
+      </div>
+    </div>
+  </div>
+  <aside class="instr" id="instr">
+    <div class="sec-head mono">03 — INSTRUMENTATION</div>
+    <dl class="kv mono">
+      <dt>RUN_ID</dt><dd id="i-run">—</dd>
+      <dt>MODE</dt><dd id="i-mode">MOCK</dd>
+      <dt>TELEPHONY_PROVIDER</dt><dd id="i-tel">mock</dd>
+      <dt>RETELL_AGENT_ID</dt><dd id="i-agent">—</dd>
+      <dt>LEAD</dt><dd id="i-lead">—</dd>
+      <dt>SMS_STATUS</dt><dd id="i-sms">○ IDLE</dd>
+      <dt>WAIT</dt><dd id="i-wait">—</dd>
+      <dt>CALL_STATUS</dt><dd id="i-call">○ IDLE</dd>
+      <dt>SHEET_WRITE</dt><dd id="i-sheet">○ IDLE</dd>
+      <dt>TOTAL_COST_USD</dt><dd id="i-cost" class="accent">$0.000</dd>
+      <dt>EVENTS</dt><dd id="i-events">0</dd>
+      <dt>ELAPSED</dt><dd id="i-elapsed">0.0s</dd>
+    </dl>
+    <div class="sec-head mono small">SMS TEMPLATE</div>
+    <pre class="mono tmpl" id="tmpl"></pre>
+  </aside>
+</section>
+
 </main>
 <script src="/static/app.js"></script>
 </body>
